@@ -383,6 +383,8 @@ def test_sprint_response_key_set_no_sprint_date():
             "api_version",
             "cycle_time_days",
             "lead_time_days",
+            "cycle_time_minutes",
+            "lead_time_minutes",
             "throughput",
             "points_delivered",
             "wip_violations",
@@ -3676,8 +3678,12 @@ def test_range_null_metrics_for_sprints_without_events():
         assert sprints["2026-10"]["throughput"] == 1
         assert sprints["2026-11"]["throughput"] is None
         assert sprints["2026-11"]["cycle_time_days"] is None
+        assert sprints["2026-11"]["cycle_time_minutes"] is None
+        assert sprints["2026-11"]["lead_time_minutes"] is None
         assert sprints["2026-11"]["failure_breakdown"] is None
         assert sprints["2026-12"]["throughput"] is None
+        assert sprints["2026-12"]["cycle_time_minutes"] is None
+        assert sprints["2026-12"]["lead_time_minutes"] is None
     finally:
         conn.close()
 
@@ -5781,5 +5787,211 @@ def test_post_event_with_invalid_created_at_returns_400():
         assert "error" in body
         assert isinstance(body["error"], str)
         assert len(body["error"]) > 0
+    finally:
+        conn.close()
+
+
+@requires_db
+def test_sprint_returns_cycle_and_lead_time_minutes():
+    """AC1+AC5: GET /sprint with started+finished events carrying created_at
+    returns cycle_time_minutes=686, lead_time_minutes=3686, cycle_time_days=0,
+    lead_time_days=2, status 200, Content-Type application/json."""
+    import psycopg
+
+    conn = psycopg.connect(SPRINT_METRICS_DB)
+    init_db(conn)
+    conn.execute("DELETE FROM sprint_metrics.board_events WHERE card_id = 'ac1_sprint_min'")
+    conn.commit()
+
+    port = _start_service(conn, 0)
+    try:
+        _post_events(
+            f"http://127.0.0.1:{port}/events",
+            _make_event(
+                card_id="ac1_sprint_min",
+                event_type="started",
+                timestamp="2024-01-03T10:00:00Z",
+                sprint="2024-01",
+                created="2024-01-01",
+                created_at="2024-01-01T08:00:00Z",
+            ),
+        )
+        _post_events(
+            f"http://127.0.0.1:{port}/events",
+            _make_event(
+                card_id="ac1_sprint_min",
+                event_type="finished",
+                timestamp="2024-01-03T21:26:00Z",
+                sprint="2024-01",
+                created="2024-01-01",
+                created_at="2024-01-01T08:00:00Z",
+            ),
+        )
+
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/sprint?label=2024-01", timeout=5
+        ) as resp:
+            assert resp.status == 200
+            assert "application/json" in resp.headers.get("Content-Type", "")
+            body = json.loads(resp.read().decode())
+
+        assert body["cycle_time_minutes"] == 686
+        assert body["lead_time_minutes"] == 3686
+        assert body["cycle_time_days"] == 0
+        assert body["lead_time_days"] == 2
+    finally:
+        conn.close()
+
+
+@requires_db
+def test_sprint_no_events_minutes_null():
+    """AC2+AC6: GET /sprint for a sprint with no events returns cycle_time_minutes
+    and lead_time_minutes as null (all metric fields null, not 0)."""
+    import psycopg
+
+    conn = psycopg.connect(SPRINT_METRICS_DB)
+    init_db(conn)
+    conn.execute("DELETE FROM sprint_metrics.board_events WHERE sprint = '2024-03'")
+    conn.commit()
+
+    port = _start_service(conn, 0)
+    try:
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/sprint?label=2024-03", timeout=5
+        ) as resp:
+            assert resp.status == 200
+            body = json.loads(resp.read().decode())
+
+        assert body["cycle_time_minutes"] is None
+        assert body["lead_time_minutes"] is None
+        assert body["cycle_time_days"] is None
+        assert body["lead_time_days"] is None
+        assert body["throughput"] is None
+        assert body["points_delivered"] is None
+        assert body["wip_violations"] is None
+        assert body["blocked_aging_days"] is None
+        assert body["escalation_rate_percent"] is None
+        assert body["escalation_count"] is None
+        assert body["first_attempt_rate_percent"] is None
+        assert body["first_attempt_numerator"] is None
+        assert body["first_attempt_denominator"] is None
+        assert body["failure_breakdown"] is None
+        assert body["top_failure_causes"] is None
+        assert body["superseded_count"] is None
+        assert body["superseded_points"] is None
+        assert body["superseded_breakdown"] is None
+        assert body["flags"] is None
+    finally:
+        conn.close()
+
+
+@requires_db
+def test_range_null_minutes_for_sprints_without_events():
+    """AC3: GET /range spanning three sprints where 2024-01 and 2024-02 have
+    events but 2024-03 does not. The 2024-03 entry has cycle_time_minutes and
+    lead_time_minutes as null; the 2024-02 entry's prior has cycle_time_minutes
+    as an integer (from 2024-01's value)."""
+    import psycopg
+
+    conn = psycopg.connect(SPRINT_METRICS_DB)
+    init_db(conn)
+    conn.execute(
+        "DELETE FROM sprint_metrics.board_events WHERE card_id IN ('ac3_range_min', 'ac3_range_min_2')"
+    )
+    conn.execute(
+        "DELETE FROM sprint_metrics.board_events WHERE sprint IN ('2024-01', '2024-02', '2024-03')"
+    )
+    conn.commit()
+
+    port = _start_service(conn, 0)
+    try:
+        # Sprint 2024-01: one completed card with sub-day timestamps
+        _post_events(
+            f"http://127.0.0.1:{port}/events",
+            _make_event(
+                card_id="ac3_range_min",
+                event_type="started",
+                timestamp="2024-01-03T10:00:00Z",
+                sprint="2024-01",
+                created="2024-01-01",
+                created_at="2024-01-01T08:00:00Z",
+            ),
+        )
+        _post_events(
+            f"http://127.0.0.1:{port}/events",
+            _make_event(
+                card_id="ac3_range_min",
+                event_type="finished",
+                timestamp="2024-01-03T21:26:00Z",
+                sprint="2024-01",
+                created="2024-01-01",
+                created_at="2024-01-01T08:00:00Z",
+            ),
+        )
+        # Sprint 2024-02: one completed card with sub-day timestamps
+        _post_events(
+            f"http://127.0.0.1:{port}/events",
+            _make_event(
+                card_id="ac3_range_min_2",
+                event_type="started",
+                timestamp="2024-02-03T10:00:00Z",
+                sprint="2024-02",
+                created="2024-02-01",
+                created_at="2024-02-01T08:00:00Z",
+            ),
+        )
+        _post_events(
+            f"http://127.0.0.1:{port}/events",
+            _make_event(
+                card_id="ac3_range_min_2",
+                event_type="finished",
+                timestamp="2024-02-03T14:00:00Z",
+                sprint="2024-02",
+                created="2024-02-01",
+                created_at="2024-02-01T08:00:00Z",
+            ),
+        )
+
+        status, body = _get_json(f"http://127.0.0.1:{port}/range?start=2024-01&end=2024-03")
+        assert status == 200
+        sprints = body["sprints"]
+        assert list(sprints.keys()) == ["2024-01", "2024-02", "2024-03"]
+        # 2024-03 has no events: null minutes
+        assert sprints["2024-03"]["cycle_time_minutes"] is None
+        assert sprints["2024-03"]["lead_time_minutes"] is None
+        # 2024-02's prior (2024-01) has cycle_time_minutes as an integer
+        assert isinstance(sprints["2024-02"]["prior"]["cycle_time_minutes"], int)
+    finally:
+        conn.close()
+
+
+@requires_db
+def test_sprint_only_started_event_null_minutes_zero_throughput():
+    """AC4: GET /sprint for a sprint with only a started event (no finished)
+    returns cycle_time_minutes=null and throughput=0."""
+    import psycopg
+
+    conn = psycopg.connect(SPRINT_METRICS_DB)
+    init_db(conn)
+    conn.execute("DELETE FROM sprint_metrics.board_events WHERE card_id = 'ac4_only_started'")
+    conn.commit()
+
+    port = _start_service(conn, 0)
+    try:
+        _post_events(
+            f"http://127.0.0.1:{port}/events",
+            _make_event(
+                card_id="ac4_only_started",
+                event_type="started",
+                timestamp="2024-01-03T10:00:00Z",
+                sprint="2024-01",
+                created="2024-01-01",
+            ),
+        )
+
+        status, body = _get_json(f"http://127.0.0.1:{port}/sprint?label=2024-01")
+        assert status == 200
+        assert body["cycle_time_minutes"] is None
+        assert body["throughput"] == 0
     finally:
         conn.close()
