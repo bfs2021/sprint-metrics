@@ -14,9 +14,8 @@ from sprint_metrics import (
     main,
 )
 
-HEADER = "| Sprint | Cycle time | Lead time | Throughput | WIP violations | Blocked aging | Escalation rate |"
-SEPARATOR = "|--------|------------|-----------|------------|----------------|---------------|"
-SEPARATOR = "|--------|------------|-----------|------------|----------------|---------------|-----------------|"
+HEADER = "| Sprint | Cycle time | Lead time | Throughput | Superseded | WIP violations | Blocked aging | Escalation rate | First attempt | Top causes |"
+SEPARATOR = "|--------|------------|-----------|------------|------------|----------------|---------------|-----------------|---------------|------------|"
 
 # A card completed on the 7th, started 4 days earlier and created 6 days earlier.
 COMPLETED_CARD = {"created": "2024-01-01", "started": "2024-01-03", "completed": "2024-01-07"}
@@ -68,7 +67,7 @@ def test_command_reports_cycle_and_lead_time_for_a_completed_card(run_command):
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 4 days | 6 days | 1 | 0 | 0 days | 0% |" in output
+    assert "| Current | 4 days | 6 days | 1 | 0 | 0 | 0 days | 0% |" in output
 
 
 def test_command_reports_zero_when_nothing_is_completed(run_command):
@@ -79,7 +78,7 @@ def test_command_reports_zero_when_nothing_is_completed(run_command):
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 0 days | 0 days | 0 | 0 | 0 days | 0% |" in output
+    assert "| Current | 0 days | 0 days | 0 | 0 | 0 | 0 days | 0% |" in output
 
 
 def test_command_reports_zero_for_an_empty_sprint(run_command):
@@ -87,7 +86,7 @@ def test_command_reports_zero_for_an_empty_sprint(run_command):
     exit_code, output, _ = run_command([])
 
     assert exit_code == 0
-    assert "| Current | 0 days | 0 days | 0 | 0 | 0 days | 0% |" in output
+    assert "| Current | 0 days | 0 days | 0 | 0 | 0 | 0 days | 0% |" in output
 
 
 def test_command_reports_throughput_for_five_completed_cards(run_command):
@@ -99,7 +98,7 @@ def test_command_reports_throughput_for_five_completed_cards(run_command):
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 4 days | 6 days | 5 | 0 | 0 days | 0% |" in output
+    assert "| Current | 4 days | 6 days | 5 | 0 | 0 | 0 days | 0% |" in output
 
 
 def test_command_reports_throughput_zero_when_no_cards_completed(run_command):
@@ -111,7 +110,7 @@ def test_command_reports_throughput_zero_when_no_cards_completed(run_command):
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 0 days | 0 days | 0 | 0 | 0 days | 0% |" in output
+    assert "| Current | 0 days | 0 days | 0 | 0 | 0 | 0 days | 0% |" in output
 
 
 def test_malformed_dates_are_reported_without_a_traceback(run_command):
@@ -146,7 +145,9 @@ def test_completed_card_that_was_never_started_has_no_cycle_time():
 def test_cards_may_be_passed_as_dataclasses():
     card = Card(created=date(2024, 1, 1), started=date(2024, 1, 3), completed=date(2024, 1, 7))
 
-    assert "| Current | 4 days | 6 days | 1 | 0 | 0 days | 0% |" in format_performance_table([card])
+    assert "| Current | 4 days | 6 days | 1 | 0 | 0 | 0 days | 0% |" in format_performance_table(
+        [card]
+    )
 
 
 def test_throughput_counts_completed_cards():
@@ -175,7 +176,7 @@ def test_command_reports_a_wip_violation_when_the_limit_is_exceeded(run_command)
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 0 days | 0 days | 0 | 1 | 0 days | 0% |" in output
+    assert "| Current | 0 days | 0 days | 0 | 0 | 1 | 0 days | 0% |" in output
 
 
 def test_command_reports_no_wip_violations_when_no_limits_are_configured(run_command):
@@ -187,7 +188,7 @@ def test_command_reports_no_wip_violations_when_no_limits_are_configured(run_com
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 0 days | 0 days | 0 | 0 | 0 days | 0% |" in output
+    assert "| Current | 0 days | 0 days | 0 | 0 | 0 | 0 days | 0% |" in output
 
 
 def test_malformed_wip_limits_are_reported_without_a_traceback(run_command):
@@ -258,7 +259,7 @@ def test_command_reports_blocked_aging_for_a_blocked_card(run_command):
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 0 days | 0 days | 0 | 0 | 2 days | 0% |" in output
+    assert "| Current | 0 days | 0 days | 0 | 0 | 0 | 2 days | 0% |" in output
 
 
 def test_command_reports_zero_blocked_aging_when_no_cards_blocked(run_command):
@@ -269,7 +270,7 @@ def test_command_reports_zero_blocked_aging_when_no_cards_blocked(run_command):
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 4 days | 6 days | 1 | 0 | 0 days | 0% |" in output
+    assert "| Current | 4 days | 6 days | 1 | 0 | 0 | 0 days | 0% |" in output
 
 
 def test_command_reports_escalation_rate_with_escalations(run_command):
@@ -281,7 +282,7 @@ def test_command_reports_escalation_rate_with_escalations(run_command):
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 4 days | 6 days | 10 | 0 | 0 days | 20% |" in output
+    assert "| Current | 4 days | 6 days | 10 | 0 | 0 | 0 days | 20% |" in output
 
 
 def test_command_reports_zero_escalation_rate_when_no_completed_cards(run_command):
@@ -292,7 +293,7 @@ def test_command_reports_zero_escalation_rate_when_no_completed_cards(run_comman
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 0 days | 0 days | 0 | 0 | 0 days | 0% |" in output
+    assert "| Current | 0 days | 0 days | 0 | 0 | 0 | 0 days | 0% |" in output
 
 
 def test_escalation_rate_is_zero_when_no_cards_completed():
@@ -311,12 +312,19 @@ def test_escalation_rate_rounds_to_nearest_percent():
 
 
 def test_command_reports_markdown_when_markdown_option_is_used(run_command):
-    """AC1: when the markdown output option is used, the command writes a markdown
-    report to standard output and does not write the table or JSON output."""
-    exit_code, output, _ = run_command([COMPLETED_CARD], markdown=True)
+    """AC1: --markdown produces a report with the crew performance summary,
+    the current sprint section with cycle time, lead time, throughput, WIP
+    violations, blocked aging, escalation rate, and first-attempt rate, and a
+    definitions section."""
+    cards = [
+        {"created": "2024-01-01", "started": "2024-01-03", "completed": "2024-01-07"},
+    ]
+    exit_code, output, _ = run_command(cards, markdown=True)
 
     assert exit_code == 0
     assert "# Crew Performance Report" in output
+    assert "## Crew Performance Summary" in output
+    assert "- **Completed**: 1" in output
     assert "## Current Sprint" in output
     assert "- **Cycle time**: 4 days" in output
     assert "- **Lead time**: 6 days" in output
@@ -324,8 +332,9 @@ def test_command_reports_markdown_when_markdown_option_is_used(run_command):
     assert "- **WIP violations**: 0" in output
     assert "- **Blocked aging**: 0 days" in output
     assert "- **Escalation rate**: 0%" in output
-    assert HEADER not in output
-    assert SEPARATOR not in output
+    assert "- **First-attempt rate**: 100%" in output
+    assert "## Definitions" in output
+    assert "- Superseded: Number of superseded stories in the sprint" in output
 
 
 def test_command_does_not_produce_markdown_output_by_default(run_command):
@@ -652,7 +661,7 @@ def test_command_reports_blocked_aging_as_of_sprint_date_in_table(run_command):
     exit_code, output, _ = run_command(cards, sprint_date="2024-01-31")
 
     assert exit_code == 0
-    assert "| 4 days | 6 days | 1 | 0 | 29 days | 0% |" in output
+    assert "| 4 days | 6 days | 1 | 0 | 0 | 29 days | 0% |" in output
 
 
 def test_command_reports_blocked_aging_as_of_sprint_date_in_json(run_command):
@@ -1147,6 +1156,7 @@ def test_markdown_metrics_selected_lines_present_and_unselected_absent(tmp_path,
     assert "- **Cycle time**: 4 days" in captured.out
     assert "- **Throughput**: 1 cards" in captured.out
     assert "- **Lead time**" not in captured.out
+    assert "- **Superseded stories**" not in captured.out
     assert "- **WIP violations**" not in captured.out
     assert "- **Blocked aging**" not in captured.out
     assert "- **Escalation rate**" not in captured.out
@@ -1183,6 +1193,7 @@ def test_markdown_metrics_with_thresholds_flags_only_visible_metric(tmp_path, ca
     assert "- **Cycle time**: 7 days \u26a0\ufe0f" in captured.out
     assert "- **Lead time**" not in captured.out
     assert "- **Throughput**" not in captured.out
+    assert "- **Superseded stories**" not in captured.out
     assert "- **WIP violations**" not in captured.out
     assert "- **Blocked aging**" not in captured.out
     assert "- **Escalation rate**" not in captured.out

@@ -424,9 +424,9 @@ sprint-metrics cards.json
 ```
 
 ```
-| Sprint | Cycle time | Lead time | Throughput | WIP violations | Blocked aging | Escalation rate | First attempt | Top causes |
-|--------|------------|-----------|------------|----------------|---------------|-----------------|---------------|------------|
-| Current | 4 days | 6 days | 1 | 0 | 0 days | 0% | 100% | — |
+| Sprint | Cycle time | Lead time | Throughput | Superseded | WIP violations | Blocked aging | Escalation rate | First attempt | Top causes |
+|--------|------------|-----------|------------|------------|----------------|---------------|-----------------|---------------|------------|
+| Current | 4 days | 6 days | 1 | 0 | 0 | 0 days | 0% | 100% | — |
 ```
 
 ### JSON
@@ -476,6 +476,7 @@ Status: All clear
 - Cycle time: Mean days from when a card started work to when it completed
 - Lead time: Mean days from creation to completion
 - Throughput: Number of cards completed this sprint
+- Superseded: Number of superseded stories in the sprint
 - WIP violations: Number of states whose peak occupancy exceeded the configured WIP limit
 - Blocked aging: Maximum number of days any card has been blocked
 - Escalation rate: Escalations as a percentage of completed cards
