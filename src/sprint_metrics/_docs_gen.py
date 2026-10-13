@@ -58,17 +58,30 @@ def _generate_metrics_content() -> str:
         "first_attempt_denominator": "Return the total count of completed cards.",
         "escalation_count": "Return the number of escalated events in the sprint.",
         "superseded_count": (
-            "Return the count of superseded stories in the sprint. "
+            "Return the number of cards marked superseded in the sprint. "
             "Excluded from throughput and in-flight calculations."
         ),
         "superseded_points": (
-            "Return the sum of points on superseded stories. "
+            "Return the sum of the points value on superseded cards "
+            "(0 when a superseded card carries no points value). "
             "Excluded from throughput and in-flight calculations."
         ),
         "superseded_breakdown": (
-            "Return the per-reason count of superseded stories. "
+            "Return the per-reason breakdown of superseded cards, "
+            "keyed by 'sponsor' and 'story_problem' with their counts. "
             "Excluded from throughput and in-flight calculations."
         ),
+    }
+
+    prom_overrides: dict[str, str] = {
+        "failure_breakdown": "sprint_failure_count",
+        "superseded_count": "sprint_metrics_superseded_stories",
+        "superseded_points": "sprint_metrics_superseded_points",
+        "superseded_breakdown": "sprint_metrics_superseded_by_reason",
+    }
+
+    display_overrides: dict[str, str] = {
+        "superseded_count": "Superseded count",
     }
 
     lines = [
@@ -76,7 +89,7 @@ def _generate_metrics_content() -> str:
         "|---|---|---|---|",
     ]
     for metric_key in sorted(ALL_METRICS):
-        display_name = _METRIC_COLUMNS.get(metric_key)
+        display_name = display_overrides.get(metric_key, _METRIC_COLUMNS.get(metric_key))
         if display_name is None:
             continue
         if metric_key in metric_descriptions:
@@ -87,10 +100,7 @@ def _generate_metrics_content() -> str:
                 continue
             func = getattr(metrics_mod, func_name)
             description = _first_doc_line(func)
-        if metric_key == "failure_breakdown":
-            prom_name = "sprint_failure_count"
-        else:
-            prom_name = f"sprint_{metric_key}"
+        prom_name = prom_overrides.get(metric_key, f"sprint_{metric_key}")
         lines.append(f"| {display_name} | `{metric_key}` | {description} | `{prom_name}` |")
     return "\n".join(lines) + "\n"
 
