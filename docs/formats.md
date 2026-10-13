@@ -491,6 +491,32 @@ Status: All clear
 | 2024-01-04 | — | — | — | Not Started | 1 | — | — |
 ```
 
+When cards carry datetime precision (e.g. `created_at`, `started_at`, `completed_at`), the cycle time and lead time lines render in hours and minutes. When only date-level data is available, the report falls back to the day-level rendering shown above.
+
+**Datetime input** (`cards_datetime.json`):
+
+```json
+[
+  {"created_at": "2024-01-01T06:00:00Z", "started_at": "2024-01-01T08:00:00Z", "completed_at": "2024-01-01T19:26:00Z"}
+]
+```
+
+```
+sprint-metrics cards_datetime.json --markdown
+```
+
+```markdown
+## Current Sprint
+
+- **Cycle time**: 11h 26m
+- **Lead time**: 13h 26m
+- **Throughput**: 1 cards
+- **WIP violations**: 0
+- **Blocked aging**: 0 days
+- **Escalation rate**: 0%
+- **First-attempt rate**: 100%
+```
+
 > The report date reflects the day the example was captured.
 
 ### Prometheus
