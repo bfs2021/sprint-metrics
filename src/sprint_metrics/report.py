@@ -215,6 +215,8 @@ def _sprint_section(
     if not cards:
         return ["No performance data available", "", "- **First-attempt rate**: 0%"]
     cycle_time, lead_time = calculate_cycle_time_and_lead_time(cards)
+    cycle_minutes = calculate_cycle_time_minutes(cards)
+    lead_minutes = calculate_lead_time_minutes(cards)
     throughput = calculate_throughput(cards)
     points_delivered = calculate_points_delivered(cards)
     wip_violations = calculate_wip_violations(cards, wip_limits)
@@ -233,6 +235,8 @@ def _sprint_section(
 
     if prior_cards is not None:
         prior_cycle, prior_lead = calculate_cycle_time_and_lead_time(prior_cards)
+        prior_cycle_minutes = calculate_cycle_time_minutes(prior_cards)
+        prior_lead_minutes = calculate_lead_time_minutes(prior_cards)
         prior_throughput = calculate_throughput(prior_cards)
         prior_points = calculate_points_delivered(prior_cards)
         prior_wip = calculate_wip_violations(prior_cards, wip_limits)
@@ -246,16 +250,36 @@ def _sprint_section(
         for metric in selected:
             if metric == "cycle_time_days":
                 delta = cycle_time - prior_cycle
+                if cycle_minutes is not None:
+                    current_display = _format_minutes(cycle_minutes)
+                    prior_display = (
+                        _format_minutes(prior_cycle_minutes)
+                        if prior_cycle_minutes is not None
+                        else f"{prior_cycle} days"
+                    )
+                else:
+                    current_display = f"{cycle_time} days"
+                    prior_display = f"{prior_cycle} days"
                 lines.append(
-                    f"- **Cycle time**: {cycle_time} days {_trend_arrow(delta)} "
-                    f"(was {prior_cycle} days, {_signed(delta)})"
+                    f"- **Cycle time**: {current_display} {_trend_arrow(delta)} "
+                    f"(was {prior_display}, {_signed(delta)})"
                     f"{_threshold_context(cycle_time, thresholds, 'cycle_time_days')}"
                 )
             elif metric == "lead_time_days":
                 delta = lead_time - prior_lead
+                if lead_minutes is not None:
+                    current_display = _format_minutes(lead_minutes)
+                    prior_display = (
+                        _format_minutes(prior_lead_minutes)
+                        if prior_lead_minutes is not None
+                        else f"{prior_lead} days"
+                    )
+                else:
+                    current_display = f"{lead_time} days"
+                    prior_display = f"{prior_lead} days"
                 lines.append(
-                    f"- **Lead time**: {lead_time} days {_trend_arrow(delta)} "
-                    f"(was {prior_lead} days, {_signed(delta)})"
+                    f"- **Lead time**: {current_display} {_trend_arrow(delta)} "
+                    f"(was {prior_display}, {_signed(delta)})"
                     f"{_threshold_context(lead_time, thresholds, 'lead_time_days')}"
                 )
             elif metric == "throughput":
@@ -361,12 +385,20 @@ def _sprint_section(
     lines = ["## Current Sprint", ""]
     for metric in selected:
         if metric == "cycle_time_days":
+            if cycle_minutes is not None:
+                cycle_display = _format_minutes(cycle_minutes)
+            else:
+                cycle_display = f"{cycle_time} days"
             lines.append(
-                f"- **Cycle time**: {cycle_time} days{_threshold_context(cycle_time, thresholds, 'cycle_time_days')}"
+                f"- **Cycle time**: {cycle_display}{_threshold_context(cycle_time, thresholds, 'cycle_time_days')}"
             )
         elif metric == "lead_time_days":
+            if lead_minutes is not None:
+                lead_display = _format_minutes(lead_minutes)
+            else:
+                lead_display = f"{lead_time} days"
             lines.append(
-                f"- **Lead time**: {lead_time} days{_threshold_context(lead_time, thresholds, 'lead_time_days')}"
+                f"- **Lead time**: {lead_display}{_threshold_context(lead_time, thresholds, 'lead_time_days')}"
             )
         elif metric == "throughput":
             lines.append(
@@ -714,12 +746,22 @@ def _prior_sprint_section(
     if not cards:
         return ["No performance data available"]
     cycle_time, lead_time = calculate_cycle_time_and_lead_time(cards)
+    cycle_minutes = calculate_cycle_time_minutes(cards)
+    lead_minutes = calculate_lead_time_minutes(cards)
     first_attempt_rate = calculate_first_attempt_rate(cards)
+    if cycle_minutes is not None:
+        cycle_display = _format_minutes(cycle_minutes)
+    else:
+        cycle_display = f"{cycle_time} days"
+    if lead_minutes is not None:
+        lead_display = _format_minutes(lead_minutes)
+    else:
+        lead_display = f"{lead_time} days"
     return [
         f"## Prior Sprint {label}",
         "",
-        f"- **Cycle time**: {cycle_time} days",
-        f"- **Lead time**: {lead_time} days",
+        f"- **Cycle time**: {cycle_display}",
+        f"- **Lead time**: {lead_display}",
         f"- **Throughput**: {calculate_throughput(cards)} cards",
         f"- **WIP violations**: {calculate_wip_violations(cards, wip_limits)}",
         f"- **Blocked aging**: {calculate_blocked_aging(cards, as_of)} days",
@@ -1093,3 +1135,17 @@ _MARKDOWN_ORDER: tuple[str, ...] = (
     "superseded_count",
     "failure_breakdown",
 )
+
+
+def _format_minutes(mins: int) -> str:
+    """Format a duration in whole minutes as hours-and-minutes.
+
+    '0m' at zero, '{m}m' when < 60, '{h}h {m}m' when >= 60.
+    Hours are never zero-padded.
+    """
+    if mins == 0:
+        return "0m"
+    if mins < 60:
+        return f"{mins}m"
+    hours, remainder = divmod(mins, 60)
+    return f"{hours}h {remainder}m"

@@ -3242,3 +3242,109 @@ def test_prometheus_superseded_filtered_shows_all_four_lines(tmp_path, capsys):
     assert 'sprint_metrics_superseded_by_reason{reason="story_problem"} 0' in lines
     assert "sprint_cycle_time_days" not in captured.out
     assert "sprint_throughput_cards" not in captured.out
+
+
+def test_markdown_cycle_and_lead_time_shows_hours_and_minutes(run_command):
+    """AC1: datetime-precision card renders cycle and lead in hours-and-minutes."""
+    cards = [
+        {
+            "created": "2024-01-01",
+            "started": "2024-01-01",
+            "completed": "2024-01-01",
+            "created_at": "2024-01-01T06:00:00Z",
+            "started_at": "2024-01-01T08:00:00Z",
+            "completed_at": "2024-01-01T19:26:00Z",
+        }
+    ]
+    exit_code, output, _ = run_command(cards, markdown=True)
+    assert exit_code == 0
+    assert "- **Cycle time**: 11h 26m" in output
+    assert "- **Lead time**: 13h 26m" in output
+    for line in output.splitlines():
+        if "Cycle time" in line or "Lead time" in line:
+            assert "0 days" not in line
+
+
+def test_markdown_date_only_card_shows_days_fallback(run_command):
+    """AC2: date-only card (no datetime fields) keeps the day-level rendering."""
+    cards = [
+        {"created": "2024-01-01", "started": "2024-01-01", "completed": "2024-01-01"},
+    ]
+    exit_code, output, _ = run_command(cards, markdown=True)
+    assert exit_code == 0
+    assert "- **Cycle time**: 0 days" in output
+    assert "- **Lead time**: 0 days" in output
+
+
+def test_markdown_cycle_minutes_lead_fallback_days(run_command):
+    """AC3: card with started_at/completed_at but no created_at shows cycle in minutes,
+    lead falls back to days, and no warning character appears."""
+    cards = [
+        {
+            "created": "2024-01-01",
+            "completed": "2024-01-01",
+            "started_at": "2024-01-01T08:00:00Z",
+            "completed_at": "2024-01-01T08:05:00Z",
+        }
+    ]
+    exit_code, output, _ = run_command(cards, markdown=True)
+    assert exit_code == 0
+    assert "- **Cycle time**: 5m" in output
+    assert "- **Lead time**: 0 days" in output
+    assert "\u26a0\ufe0f" not in output
+
+
+def test_markdown_two_datetime_cards_average_minutes_format(run_command):
+    """AC5: two datetime cards produce average cycle '7h 0m' and lead '15h 38m',
+    neither containing ' days'."""
+    cards = [
+        {
+            "created": "2024-01-01",
+            "started": "2024-01-01",
+            "completed": "2024-01-01",
+            "created_at": "2024-01-01T00:00:00Z",
+            "started_at": "2024-01-01T08:20:00Z",
+            "completed_at": "2024-01-01T13:20:00Z",
+        },
+        {
+            "created": "2024-01-01",
+            "started": "2024-01-01",
+            "completed": "2024-01-01",
+            "created_at": "2024-01-01T00:00:00Z",
+            "started_at": "2024-01-01T08:56:00Z",
+            "completed_at": "2024-01-01T17:56:00Z",
+        },
+    ]
+    exit_code, output, _ = run_command(cards, markdown=True)
+    assert exit_code == 0
+    cycle_line = "- **Cycle time**: 7h 0m"
+    lead_line = "- **Lead time**: 15h 38m"
+    assert cycle_line in output
+    assert lead_line in output
+    cycle_idx = output.index(cycle_line)
+    lead_idx = output.index(lead_line)
+    assert cycle_idx < lead_idx
+    for line in output.splitlines():
+        if line.startswith("- **Cycle time**:") or line.startswith("- **Lead time**:"):
+            assert " days" not in line
+
+
+def test_markdown_cycle_minutes_line_precedes_lead_days_line(run_command):
+    """AC6: cycle line uses minute format while lead line falls back to day-level,
+    and the lead line immediately follows the cycle line."""
+    cards = [
+        {
+            "created": "2024-01-01",
+            "completed": "2024-01-01",
+            "started_at": "2024-01-01T08:00:00Z",
+            "completed_at": "2024-01-01T08:05:00Z",
+        }
+    ]
+    exit_code, output, _ = run_command(cards, markdown=True)
+    assert exit_code == 0
+    lines = output.splitlines()
+    cycle_line = "- **Cycle time**: 5m"
+    lead_line = "- **Lead time**: 0 days"
+    cycle_idx = lines.index(cycle_line)
+    lead_idx = lines.index(lead_line)
+    assert lead_idx == cycle_idx + 1

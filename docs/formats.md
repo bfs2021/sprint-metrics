@@ -473,8 +473,8 @@ Status: All clear
 
 ## Definitions
 
-- Cycle time: Mean days from when a card started work to when it completed
-- Lead time: Mean days from creation to completion
+- Cycle time: Mean time from when a card started work to when it completed; shown in hours and minutes when cards carry datetime precision, otherwise in days
+- Lead time: Mean time from creation to completion; shown in hours and minutes when cards carry datetime precision, otherwise in days
 - Throughput: Number of cards completed this sprint
 - Superseded: Number of superseded stories in the sprint
 - WIP violations: Number of states whose peak occupancy exceeded the configured WIP limit
