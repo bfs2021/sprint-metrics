@@ -22,7 +22,7 @@ The service accepts sprint definitions via POST /sprints. Each sprint is registe
 
 The service accepts board events via POST /events. The accepted event types are: started, blocked, unblocked, finished, escalated, attempt_failed, and superseded. A card's work counts in the sprint where it finishes, wherever it started. The `sprint` field accepts any non-empty string (e.g. 'Sprint 18', 'Q4-2026'); it is not restricted to calendar-month labels.
 
-Re-sending an event that the service already holds — same card_id, type, and timestamp — is safe to perform repeatedly. The service fills in fields that are NULL in the stored row with the values from the re-sent event, and leaves unchanged any field that already holds a value. The result is a partial fill of the existing row, not a full replacement. A client may replay a log of events or upgrade its payload to include a field it did not previously send without risk of overwriting data the service already stored.
+Re-sending an event that the service already holds — same card_id, type, and timestamp — is safe to perform repeatedly. The service fills in fields that are NULL in the stored row with the values from the re-sent event, and leaves unchanged any field that already holds a value. The result is a partial fill of the existing row, not a full replacement and not a no-op. A client may replay a log of events or upgrade its payload to include a field it did not previously send without risk of overwriting data the service already stored.
 
 A `superseded` event marks a card that was replaced by other stories. It carries two fields beyond the common event fields:
 
