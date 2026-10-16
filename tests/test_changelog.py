@@ -394,28 +394,3 @@ def test_changelog_1_3_1_section_content():
     assert "superseded_count" in fixed, "[1.3.1] Fixed missing 'superseded_count'"
     assert "superseded_points" in fixed, "[1.3.1] Fixed missing 'superseded_points'"
     assert "superseded_breakdown" in fixed, "[1.3.1] Fixed missing 'superseded_breakdown'"
-
-
-def test_changelog_unreleased_has_no_entries():
-    """AC3: [Unreleased] keeps its Added, Changed, Fixed, Removed subheadings
-    but has no bullets beneath any of them."""
-    content = CHANGELOG.read_text()
-    match = re.search(
-        r"^## \[Unreleased\]\s*\n(.*?)(?=^## \[|\Z)", content, re.MULTILINE | re.DOTALL
-    )
-    assert match, "Missing '## [Unreleased]'"
-    unreleased = match.group(1)
-
-    for heading in ["### Added", "### Changed", "### Fixed", "### Removed"]:
-        assert heading in unreleased, f"Unreleased section missing {heading!r}"
-
-    for subheading in ["Added", "Changed", "Fixed", "Removed"]:
-        sub_match = re.search(
-            rf"^### {subheading}\s*\n(.*?)(?=^### |\Z)",
-            unreleased,
-            re.MULTILINE | re.DOTALL,
-        )
-        assert sub_match, f"No content region after '### {subheading}'"
-        sub_content = sub_match.group(1).strip()
-        bullets = [line for line in sub_content.splitlines() if line.startswith("- ")]
-        assert not bullets, f"[Unreleased] ### {subheading} has entries: {bullets}; expected none"

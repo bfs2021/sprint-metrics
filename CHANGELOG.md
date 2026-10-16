@@ -4,6 +4,8 @@
 
 ### Added
 
+- docs/service.md now documents the re-send fill-in and protection contract for POST /events
+
 ### Changed
 
 ### Fixed
