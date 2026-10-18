@@ -31,7 +31,7 @@ from sprint_metrics.sprint_range import (
     format_sprint_range_markdown,
     format_sprint_range_table,
 )
-from sprint_metrics.thresholds import _load_thresholds
+from sprint_metrics.thresholds import DEFAULT_THRESHOLDS, _load_thresholds
 
 __all__ = ["build_parser", "main"]
 
@@ -112,9 +112,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             sprints = _load_sprints(source)
             wip_limits = _load_wip_limits(wip_source) if wip_source is not None else None
-            thresholds = (
-                _load_thresholds(thresholds_source) if thresholds_source is not None else None
-            )
+            thresholds = {
+                **DEFAULT_THRESHOLDS,
+                **(_load_thresholds(thresholds_source) if thresholds_source is not None else {}),
+            }
         except (TypeError, ValueError) as exc:
             print(f"sprint-metrics: {exc}", file=sys.stderr)
             return 2
@@ -223,7 +224,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         cards = _load_cards(source)
         wip_limits = _load_wip_limits(wip_source) if wip_source is not None else None
-        thresholds = _load_thresholds(thresholds_source) if thresholds_source is not None else None
+        thresholds = {
+            **DEFAULT_THRESHOLDS,
+            **(_load_thresholds(thresholds_source) if thresholds_source is not None else {}),
+        }
     except (TypeError, ValueError) as exc:
         print(f"sprint-metrics: {exc}", file=sys.stderr)
         return 2

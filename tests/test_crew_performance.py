@@ -78,7 +78,7 @@ def test_command_reports_zero_when_nothing_is_completed(run_command):
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 0 days | 0 days | 0 | 0 | 0 | 0 days | 0% |" in output
+    assert "| Current | 0 days | 0 days | 0 ⚠️ | 0 | 0 | 0 days | 0% | 0% ⚠️ |" in output
 
 
 def test_command_reports_zero_for_an_empty_sprint(run_command):
@@ -86,7 +86,7 @@ def test_command_reports_zero_for_an_empty_sprint(run_command):
     exit_code, output, _ = run_command([])
 
     assert exit_code == 0
-    assert "| Current | 0 days | 0 days | 0 | 0 | 0 | 0 days | 0% |" in output
+    assert "| Current | 0 days | 0 days | 0 ⚠️ | 0 | 0 | 0 days | 0% | 0% ⚠️ |" in output
 
 
 def test_command_reports_throughput_for_five_completed_cards(run_command):
@@ -110,7 +110,7 @@ def test_command_reports_throughput_zero_when_no_cards_completed(run_command):
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 0 days | 0 days | 0 | 0 | 0 | 0 days | 0% |" in output
+    assert "| Current | 0 days | 0 days | 0 ⚠️ | 0 | 0 | 0 days | 0% | 0% ⚠️ |" in output
 
 
 def test_malformed_dates_are_reported_without_a_traceback(run_command):
@@ -176,7 +176,7 @@ def test_command_reports_a_wip_violation_when_the_limit_is_exceeded(run_command)
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 0 days | 0 days | 0 | 0 | 1 | 0 days | 0% |" in output
+    assert "| Current | 0 days | 0 days | 0 ⚠️ | 0 | 1 ⚠️ | 0 days | 0% | 0% ⚠️ |" in output
 
 
 def test_command_reports_no_wip_violations_when_no_limits_are_configured(run_command):
@@ -188,7 +188,7 @@ def test_command_reports_no_wip_violations_when_no_limits_are_configured(run_com
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 0 days | 0 days | 0 | 0 | 0 | 0 days | 0% |" in output
+    assert "| Current | 0 days | 0 days | 0 ⚠️ | 0 | 0 | 0 days | 0% | 0% ⚠️ |" in output
 
 
 def test_malformed_wip_limits_are_reported_without_a_traceback(run_command):
@@ -259,7 +259,7 @@ def test_command_reports_blocked_aging_for_a_blocked_card(run_command):
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 0 days | 0 days | 0 | 0 | 0 | 2 days | 0% |" in output
+    assert "| Current | 0 days | 0 days | 0 ⚠️ | 0 | 0 | 2 days | 0% | 0% ⚠️ |" in output
 
 
 def test_command_reports_zero_blocked_aging_when_no_cards_blocked(run_command):
@@ -282,7 +282,7 @@ def test_command_reports_escalation_rate_with_escalations(run_command):
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 4 days | 6 days | 10 | 0 | 0 | 0 days | 20% |" in output
+    assert "| Current | 4 days | 6 days | 10 | 0 | 0 | 0 days | 20% ⚠️ |" in output
 
 
 def test_command_reports_zero_escalation_rate_when_no_completed_cards(run_command):
@@ -293,7 +293,7 @@ def test_command_reports_zero_escalation_rate_when_no_completed_cards(run_comman
     assert exit_code == 0
     assert HEADER in output
     assert SEPARATOR in output
-    assert "| Current | 0 days | 0 days | 0 | 0 | 0 | 0 days | 0% |" in output
+    assert "| Current | 0 days | 0 days | 0 ⚠️ | 0 | 0 | 0 days | 0% | 0% ⚠️ |" in output
 
 
 def test_escalation_rate_is_zero_when_no_cards_completed():
@@ -309,6 +309,60 @@ def test_escalation_rate_rounds_to_nearest_percent():
 
     cards = [COMPLETED_CARD] * 3
     assert calculate_escalation_rate(cards, escalations=1) == 33
+
+
+def test_table_shows_200_percent_for_2_escalations_on_1_card(run_command):
+    """AC6: 1 completed card with --escalations 2 --sprint-date 2024-03-15 shows
+    '200%' in the Escalation rate column."""
+    card = {"created": "2024-03-01", "started": "2024-03-04", "completed": "2024-03-12"}
+    exit_code, output, _ = run_command([card], escalations=2, sprint_date="2024-03-15")
+
+    assert exit_code == 0
+    assert "200%" in output
+
+
+def test_table_shows_200_percent_flagged_for_2_escalations_on_1_card(run_command):
+    """AC7: 1 completed card with --escalations 2 --sprint-date 2024-03-15 and no
+    --thresholds file shows '200% ⚠️' in the Escalation rate cell because 200
+    exceeds the default threshold of 10."""
+    card = {"created": "2024-03-01", "started": "2024-03-04", "completed": "2024-03-12"}
+    exit_code, output, _ = run_command([card], escalations=2, sprint_date="2024-03-15")
+
+    assert exit_code == 0
+    assert "200% ⚠️" in output
+
+
+def test_prometheus_shows_200_for_2_escalations_on_1_card(run_command):
+    """AC8: 1 completed card with --escalations 2 --sprint-date 2024-03-15 --prometheus
+    shows the line 'sprint_escalation_rate_percent 200'."""
+    card = {"created": "2024-03-01", "started": "2024-03-04", "completed": "2024-03-12"}
+    exit_code, output, _ = run_command([card], escalations=2, sprint_date="2024-03-15", prometheus=True)
+
+    assert exit_code == 0
+    assert "sprint_escalation_rate_percent 200" in output
+
+
+def test_markdown_shows_200_percent_flagged_with_detail_for_2_escalations_on_1_card(run_command):
+    """AC9: 1 completed card with --escalations 2 --sprint-date 2024-03-15 --markdown
+    shows '- **Escalation rate**: 200% ⚠️ (threshold: 10%)' followed by
+    '  - 2 escalations, 1 completed card'."""
+    card = {"created": "2024-03-01", "started": "2024-03-04", "completed": "2024-03-12"}
+    exit_code, output, _ = run_command([card], escalations=2, sprint_date="2024-03-15", markdown=True)
+
+    assert exit_code == 0
+    lines = output.splitlines()
+    esc_idx = next(i for i, line in enumerate(lines) if line == "- **Escalation rate**: 200% ⚠️ (threshold: 10%)")
+    detail_line = lines[esc_idx + 1]
+    assert detail_line == "  - 2 escalations, 1 completed card"
+
+
+def test_table_shows_0_percent_when_no_completed_cards_and_escalations(run_command):
+    """AC10: 0 completed cards with --escalations 2 --sprint-date 2024-03-15 shows
+    '0%' in the Escalation rate column."""
+    exit_code, output, _ = run_command([], escalations=2, sprint_date="2024-03-15")
+
+    assert exit_code == 0
+    assert "0%" in output
 
 
 def test_command_reports_markdown_when_markdown_option_is_used(run_command):
@@ -665,7 +719,7 @@ def test_command_reports_blocked_aging_as_of_sprint_date_in_table(run_command):
     exit_code, output, _ = run_command(cards, sprint_date="2024-01-31")
 
     assert exit_code == 0
-    assert "| 4 days | 6 days | 1 | 0 | 0 | 29 days | 0% |" in output
+    assert "| 4 days | 6 days | 1 | 0 | 0 | 29 days ⚠️ | 0% | 100% |" in output
 
 
 def test_command_reports_blocked_aging_as_of_sprint_date_in_json(run_command):
@@ -1856,7 +1910,7 @@ def test_markdown_wip_violations_names_breached_state_with_peak_and_limit(run_co
 
     assert exit_code == 0
     lines = output.splitlines()
-    wip_idx = next(i for i, line in enumerate(lines) if line == "- **WIP violations**: 1")
+    wip_idx = next(i for i, line in enumerate(lines) if line == "- **WIP violations**: 1 ⚠️ (threshold: 0)")
     detail_line = lines[wip_idx + 1]
     assert detail_line.startswith("  - ")
     assert "In Progress" in detail_line
@@ -1902,7 +1956,7 @@ def test_markdown_wip_violations_names_multiple_breached_states_in_order(run_com
 
     assert exit_code == 0
     lines = output.splitlines()
-    wip_idx = next(i for i, line in enumerate(lines) if line == "- **WIP violations**: 2")
+    wip_idx = next(i for i, line in enumerate(lines) if line == "- **WIP violations**: 2 ⚠️ (threshold: 0)")
     line1 = lines[wip_idx + 1]
     line2 = lines[wip_idx + 2]
     assert line1.startswith("  - ")
@@ -1938,7 +1992,7 @@ def test_markdown_wip_violations_only_metric_shows_exactly_two_lines(tmp_path, c
 
     assert exit_code == 0
     lines = captured.out.splitlines()
-    wip_idx = next(i for i, line in enumerate(lines) if line == "- **WIP violations**: 1")
+    wip_idx = next(i for i, line in enumerate(lines) if line == "- **WIP violations**: 1 ⚠️ (threshold: 0)")
     detail_line = lines[wip_idx + 1]
     assert detail_line.startswith("  - ")
     assert "In Progress" in detail_line
@@ -1962,7 +2016,7 @@ def test_markdown_wip_violations_only_names_breached_state(run_command):
 
     assert exit_code == 0
     lines = output.splitlines()
-    wip_idx = next(i for i, line in enumerate(lines) if line == "- **WIP violations**: 1")
+    wip_idx = next(i for i, line in enumerate(lines) if line == "- **WIP violations**: 1 ⚠️ (threshold: 0)")
     detail_line = lines[wip_idx + 1]
     assert detail_line.startswith("  - ")
     assert "In Progress" in detail_line
@@ -1982,7 +2036,7 @@ def test_markdown_wip_detail_line_followed_by_next_metric(run_command):
 
     assert exit_code == 0
     lines = output.splitlines()
-    wip_idx = next(i for i, line in enumerate(lines) if line == "- **WIP violations**: 1")
+    wip_idx = next(i for i, line in enumerate(lines) if line == "- **WIP violations**: 1 ⚠️ (threshold: 0)")
     detail_line = lines[wip_idx + 1]
     assert detail_line.startswith("  - ")
     next_metric_line = lines[wip_idx + 2]
@@ -1998,7 +2052,10 @@ def test_markdown_blocked_aging_names_worst_card(run_command):
 
     assert exit_code == 0
     lines = output.splitlines()
-    aging_idx = next(i for i, line in enumerate(lines) if line == "- **Blocked aging**: 29 days")
+    aging_idx = next(
+        i for i, line in enumerate(lines)
+        if line == "- **Blocked aging**: 29 days ⚠️ (threshold: 5 days)"
+    )
     detail_line = lines[aging_idx + 1]
     assert detail_line.startswith("  - ")
     assert "2024-01-01" in detail_line
@@ -2027,7 +2084,10 @@ def test_markdown_blocked_aging_names_only_worst_card(run_command):
 
     assert exit_code == 0
     lines = output.splitlines()
-    aging_idx = next(i for i, line in enumerate(lines) if line == "- **Blocked aging**: 30 days")
+    aging_idx = next(
+        i for i, line in enumerate(lines)
+        if line == "- **Blocked aging**: 30 days ⚠️ (threshold: 5 days)"
+    )
     detail_line = lines[aging_idx + 1]
     assert detail_line.startswith("  - ")
     assert "2024-01-05" in detail_line
@@ -2045,7 +2105,10 @@ def test_markdown_blocked_aging_names_tied_cards(run_command):
 
     assert exit_code == 0
     lines = output.splitlines()
-    aging_idx = next(i for i, line in enumerate(lines) if line == "- **Blocked aging**: 30 days")
+    aging_idx = next(
+        i for i, line in enumerate(lines)
+        if line == "- **Blocked aging**: 30 days ⚠️ (threshold: 5 days)"
+    )
     line1 = lines[aging_idx + 1]
     line2 = lines[aging_idx + 2]
     assert line1.startswith("  - ")
@@ -2075,7 +2138,10 @@ def test_markdown_blocked_aging_only_metric_shows_exactly_two_lines(tmp_path, ca
 
     assert exit_code == 0
     lines = captured.out.splitlines()
-    aging_idx = next(i for i, line in enumerate(lines) if line == "- **Blocked aging**: 29 days")
+    aging_idx = next(
+        i for i, line in enumerate(lines)
+        if line == "- **Blocked aging**: 29 days ⚠️ (threshold: 5 days)"
+    )
     detail_line = lines[aging_idx + 1]
     assert detail_line.startswith("  - ")
     assert "2024-01-01" in detail_line
@@ -2124,7 +2190,10 @@ def test_markdown_escalation_rate_shows_count_and_completed_cards(run_command):
 
     assert exit_code == 0
     lines = output.splitlines()
-    esc_idx = next(i for i, line in enumerate(lines) if line == "- **Escalation rate**: 20%")
+    esc_idx = next(
+        i for i, line in enumerate(lines)
+        if line == "- **Escalation rate**: 20% ⚠️ (threshold: 10%)"
+    )
     detail_line = lines[esc_idx + 1]
     assert detail_line.startswith("  - ")
     assert "2 escalations" in detail_line
@@ -2194,7 +2263,10 @@ def test_markdown_escalation_rate_only_metric_shows_exactly_two_lines(tmp_path, 
 
     assert exit_code == 0
     lines = captured.out.splitlines()
-    esc_idx = next(i for i, line in enumerate(lines) if line == "- **Escalation rate**: 20%")
+    esc_idx = next(
+        i for i, line in enumerate(lines)
+        if line == "- **Escalation rate**: 20% ⚠️ (threshold: 10%)"
+    )
     detail_line = lines[esc_idx + 1]
     assert detail_line.startswith("  - ")
     assert "2 escalations" in detail_line

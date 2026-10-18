@@ -106,9 +106,10 @@ def test_table_flags_cycle_time_when_threshold_breached(tmp_path, capsys):
     assert captured.out.count("⚠️") == 1
 
 
-def test_table_has_no_flags_without_thresholds_flag(tmp_path, capsys):
-    """AC2: without --thresholds, the table output contains no ⚠️ markers and the
-    metric cells are identical to the current behaviour."""
+def test_table_has_flags_for_default_thresholds_without_thresholds_flag(tmp_path, capsys):
+    """Without --thresholds, the table output still applies the built-in default
+    thresholds, so a breached metric (cycle time 7 days > default 5) is flagged
+    with a ⚠️ marker."""
     card = {"created": "2024-01-01", "started": "2024-01-01", "completed": "2024-01-08"}
     cards_path = tmp_path / "cards.json"
     cards_path.write_text(json.dumps([card]))
@@ -116,8 +117,7 @@ def test_table_has_no_flags_without_thresholds_flag(tmp_path, capsys):
     captured = capsys.readouterr()
 
     assert exit_code == 0
-    assert "| Current | 7 days | 7 days | 1 | 0 | 0 | 0 days | 0% |" in captured.out
-    assert "⚠️" not in captured.out
+    assert "| Current | 7 days ⚠️ | 7 days | 1 | 0 | 0 | 0 days | 0% |" in captured.out
 
 
 def test_table_does_not_flag_cycle_time_when_meeting_threshold_exactly(tmp_path, capsys):
