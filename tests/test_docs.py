@@ -134,6 +134,13 @@ def test_drift_check(filename: str, marker_id: str):
     """AC1: each docs/ file's marked section matches the content that
     _docs_gen would generate from the current source code."""
     _check_no_drift(DOCS_DIR / filename, marker_id, f"docs/{filename}")
+    if filename == "metrics.md":
+        section = _extract_marked_section(
+            (DOCS_DIR / "metrics.md").read_text(), "metrics"
+        )
+        assert "uncapped" in section, (
+            "docs/metrics.md must describe the escalation rate as uncapped"
+        )
 
 
 def test_drift_check_detects_stale_docstring():
