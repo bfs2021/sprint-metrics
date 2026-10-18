@@ -2687,6 +2687,26 @@ def test_json_includes_points_delivered_first_attempt_counts_and_escalation_coun
     assert "flags" in data
 
 
+def test_json_escalation_rate_flag_true_for_200_percent(tmp_path, capsys):
+    """AC5: one completed card with --escalations 2 --json sets
+    escalation_rate_percent to 200 and flags.escalation_rate_percent to True
+    because 200 exceeds the default threshold of 10."""
+    card = {
+        "created": "2024-01-01",
+        "started": "2024-01-03",
+        "completed": "2024-01-07",
+    }
+    path = tmp_path / "cards.json"
+    path.write_text(json.dumps([card]))
+    exit_code = main([str(path), "--json", "--escalations", "2"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    data = json.loads(captured.out)
+    assert data["escalation_rate_percent"] == 200
+    assert data["flags"]["escalation_rate_percent"] is True
+
+
 def test_json_empty_cards_new_metrics_are_zero(tmp_path, capsys):
     """AC2: an empty cards file with --json produces the four new fields at 0
     alongside all existing keys at their zero values."""
