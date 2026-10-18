@@ -135,9 +135,7 @@ def test_drift_check(filename: str, marker_id: str):
     _docs_gen would generate from the current source code."""
     _check_no_drift(DOCS_DIR / filename, marker_id, f"docs/{filename}")
     if filename == "metrics.md":
-        section = _extract_marked_section(
-            (DOCS_DIR / "metrics.md").read_text(), "metrics"
-        )
+        section = _extract_marked_section((DOCS_DIR / "metrics.md").read_text(), "metrics")
         assert "uncapped" in section, (
             "docs/metrics.md must describe the escalation rate as uncapped"
         )
