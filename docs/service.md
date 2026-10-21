@@ -57,6 +57,10 @@ Example cost payload on a finished event's card:
 
 The service exposes the following HTTP endpoints: POST /sprints for sprint registration, POST /events for event intake, GET /sprint for single-sprint queries, GET /range for multi-sprint queries, GET /trend for time-series queries, GET /metrics for Prometheus scraping, GET /schema/event for the event schema, and GET /health for liveness checks.
 
+GET /sprint returns metrics for a single sprint. Its failure_breakdown and top_failure_causes count returns — one entry per return, by (failure class, returning role) — not one entry per failed story. Sprints with no events return all-null values.
+
+GET /range returns metrics for a range of sprints in chronological order. Each entry includes the prior-sprint delta. Its failure_breakdown and top_failure_causes count returns — one entry per return, by (failure class, returning role) — not one entry per failed story. Sprints with no events return all-null values.
+
 GET /trend answers the question 'what was this metric in each of these sprints?' by returning a value for every sprint label in the requested calendar range, defaulting to the metric's zero value when no events exist for that sprint. The range is specified by explicit start and end labels consistent with /range: `GET /trend?metric=throughput&start=2024-01&end=2024-04`.
 
 ### Error responses
@@ -74,8 +78,8 @@ Long-lived HTTP service that accepts board events and answers sprint, range, and
 |---|---|---|
 | POST | /sprints | Register or update a sprint definition (name, start date, end date, timezone). |
 | POST | /events | Accept a board event (started, blocked, unblocked, finished, escalated, attempt_failed, superseded). The service validates the card's created date and event type. |
-| GET | /sprint | Return metrics for a single sprint. Sprints with no events return all-null values. |
-| GET | /range | Return metrics for a range of sprints in chronological order. Each entry includes the prior-sprint delta. Sprints with no events return all-null values. |
+| GET | /sprint | Return metrics for a single sprint. failure_breakdown and top_failure_causes count returns — one entry per return, by (failure class, returning role). Sprints with no events return all-null values. |
+| GET | /range | Return metrics for a range of sprints in chronological order. Each entry includes the prior-sprint delta. failure_breakdown and top_failure_causes count returns, one per return, by (failure class, returning role). Sprints with no events return all-null values. |
 | GET | /trend | Return a single metric across a sprint range. Returns a JSON object with api_version and an ordered sequence of sprint-label-to-value pairs (the values array). Valid metrics: cycle_time_days, lead_time_days, throughput, wip_violations, blocked_aging_days, escalation_rate_percent, first_attempt_rate_percent, points_delivered, first_attempt_numerator, first_attempt_denominator, escalation_count, superseded_count, superseded_points, superseded_breakdown, cycle_time_minutes, lead_time_minutes, model_minutes_middle, model_minutes_total, input_tokens_middle, input_tokens_total, output_tokens_middle, output_tokens_total, cached_input_percent, reasoning_output_percent. Minute-based metrics (cycle_time_minutes, lead_time_minutes) return JSON integer values in minutes (rounded); sprints with no events return JSON null. |
 | GET | /metrics | Return Prometheus text exposition format, one line per metric per sprint. Emits lines only for sprints that have at least one finished event. |
 | GET | /schema/event | Return the JSON Schema for the event intake body. |
