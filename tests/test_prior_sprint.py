@@ -178,7 +178,7 @@ def test_prior_sprint_json_includes_prior_and_delta(tmp_path, capsys):
         "blocked_aging_days": 0,
         "escalation_rate_percent": 0,
         "first_attempt_rate_percent": 100,
-        "top_failure_causes": {},
+        "top_failure_causes": [],
         "superseded_count": 0,
         "superseded_points": 0,
         "superseded_breakdown": {"sponsor": 0, "story_problem": 0},
@@ -309,8 +309,10 @@ def test_prior_sprint_json_top_level_first_attempt_and_top_causes(tmp_path, caps
     """AC1: 2024-01 has 3 completed cards (2 first-attempt, 1 with attempts=2
     failure_class='bug') and 2024-02 has 5 completed cards (4 first-attempt, 1 with
     attempts=2 failure_class='requirement'). --prior-sprint 2024-01 --json exits 0,
-    top-level first_attempt_rate_percent is 80, top_failure_causes is {'requirement': 1},
-    prior first_attempt_rate_percent is 67, prior top_failure_causes is {'bug': 1},
+    top-level first_attempt_rate_percent is 80, top_failure_causes is
+    [{'class': 'requirement', 'role': '', 'count': 1}],
+    prior first_attempt_rate_percent is 67, prior top_failure_causes is
+    [{'class': 'bug', 'role': '', 'count': 1}],
     and delta first_attempt_rate_percent is 13."""
     first_attempt = {"created": "2024-01-01", "started": "2024-01-03", "completed": "2024-01-07"}
     bug_card = {
@@ -339,9 +341,9 @@ def test_prior_sprint_json_top_level_first_attempt_and_top_causes(tmp_path, caps
     assert exit_code == 0
     data = json.loads(captured.out)
     assert data["first_attempt_rate_percent"] == 80
-    assert data["top_failure_causes"] == {"requirement": 1}
+    assert data["top_failure_causes"] == [{"class": "requirement", "role": "", "count": 1}]
     assert data["prior"]["first_attempt_rate_percent"] == 67
-    assert data["prior"]["top_failure_causes"] == {"bug": 1}
+    assert data["prior"]["top_failure_causes"] == [{"class": "bug", "role": "", "count": 1}]
     assert data["delta"]["first_attempt_rate_percent"] == 13
 
 

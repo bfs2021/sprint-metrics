@@ -558,7 +558,18 @@ def test_formats_worked_example_table_output(tmp_path, capsys):
     current_rows = [line for line in lines if line.startswith("| Current |")]
     assert len(current_rows) == 1, f"expected exactly one Current row, got {len(current_rows)}"
     cells = [c.strip() for c in current_rows[0].split("|") if c.strip()]
-    assert cells == ["Current", "4 days", "6 days", "1", "0", "0", "0 days", "0%", "100%", "\u2014"]
+    assert cells == [
+        "Current",
+        "4 days",
+        "6 days",
+        "1",
+        "0",
+        "0",
+        "0 days",
+        "0%",
+        "100%",
+        "1\u00d7 VERIFY (Review)",
+    ]
 
 
 def test_formats_worked_example_json_output(tmp_path, capsys):
@@ -580,15 +591,17 @@ def test_formats_worked_example_json_output(tmp_path, capsys):
     assert data["blocked_aging_days"] == 0
     assert data["escalation_rate_percent"] == 0
     assert data["first_attempt_rate_percent"] == 100
-    assert data["failure_breakdown"] == []
-    assert data["top_failure_causes"] == {}
+    assert data["failure_breakdown"] == [{"class": "VERIFY", "role": "Review", "count": 1}]
+    assert data["top_failure_causes"] == [{"class": "VERIFY", "role": "Review", "count": 1}]
     assert all(v is False for v in data["flags"].values())
 
 
 def test_formats_worked_example_markdown_output(tmp_path, capsys):
     """AC4: the same cards JSON with --markdown exits 0 and stdout contains the
-    expected structural elements: heading, report date, sprint section, and
-    summary section with Completed/In progress/Blocked lines."""
+    expected structural elements: heading, report date, sprint section,
+    summary section with Completed/In progress/Blocked lines, and the
+    Definitions section's 'Top causes' line stating returns grouped by
+    (failure class, returning role)."""
     cards = _extract_formats_cards()
     path = tmp_path / "cards.json"
     path.write_text(json.dumps(cards))
@@ -603,6 +616,10 @@ def test_formats_worked_example_markdown_output(tmp_path, capsys):
     assert "- **Completed**: 1" in captured.out
     assert "- **In progress**: 0" in captured.out
     assert "- **Blocked**: 0" in captured.out
+    assert (
+        "- Top causes: Returns from review or QA, grouped by (failure class, "
+        "returning role), most frequent first" in captured.out
+    )
 
 
 def test_formats_worked_example_prometheus_output(tmp_path, capsys):
@@ -623,6 +640,7 @@ def test_formats_worked_example_prometheus_output(tmp_path, capsys):
     assert "sprint_blocked_aging_days 0" in lines
     assert "sprint_escalation_rate_percent 0" in lines
     assert "sprint_first_attempt_rate_percent 100" in lines
+    assert 'sprint_failure_count{class="VERIFY",role="Review"} 1' in lines
 
 
 def test_sprint_range_doc_output_matches(tmp_path, capsys):
@@ -830,7 +848,7 @@ def test_formats_empty_sprint_json_output(tmp_path, capsys):
     assert data["escalation_rate_percent"] == 0
     assert data["first_attempt_rate_percent"] == 0
     assert data["failure_breakdown"] == []
-    assert data["top_failure_causes"] == {}
+    assert data["top_failure_causes"] == []
     flags = data["flags"]
     assert flags["throughput"] is True
     assert flags["first_attempt_rate_percent"] is True
