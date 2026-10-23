@@ -6,6 +6,6 @@
     "SPRINT_METRICS_DB": "postgresql://postgres:postgres@postgres:5432/sprint_metrics"
   },
   "setupCommands": [
-    ["sh", "-c", "uv sync --extra dev && exit 0 || sleep 10; uv sync --extra dev && exit 0 || sleep 10; uv sync --extra dev"]
+    ["sh", "-c", "export UV_HTTP_TIMEOUT=120; for i in 1 2 3 4 5 6; do uv sync --extra dev 2>&1 && exit 0; echo \"Attempt $i failed, retrying in 20s...\"; sleep 20; done; exit 1"]
   ]
 }
