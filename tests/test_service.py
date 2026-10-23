@@ -2526,12 +2526,20 @@ def test_post_invalid_type_emits_error_log_record(monkeypatch):
 
     port = _start_service(conn, 0)
     try:
+        import time
+
         event = _make_event(event_type="frobnicated")
         status, body = _post_events(f"http://127.0.0.1:{port}/events", event)
         assert status == 400
 
-        logs = log_exporter.get_finished_logs()
-        matching = [ld for ld in logs if "frobnicated" in (ld.log_record.body or "")]
+        # The service emits the log after sending the HTTP response, so poll briefly.
+        matching = []
+        for _ in range(50):
+            logs = log_exporter.get_finished_logs()
+            matching = [ld for ld in logs if "frobnicated" in (ld.log_record.body or "")]
+            if matching:
+                break
+            time.sleep(0.1)
         assert len(matching) >= 1
         assert matching[0].log_record.severity_number.value >= SeverityNumber.ERROR.value
     finally:

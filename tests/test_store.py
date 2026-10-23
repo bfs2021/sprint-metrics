@@ -20,7 +20,7 @@ from sprint_metrics.store import init_db, insert_event, query_sprint, upsert_spr
 
 DB_URL = os.environ.get("SPRINT_METRICS_DB")
 
-pytestmark = pytest.mark.skipif(
+requires_db = pytest.mark.skipif(
     not DB_URL or psycopg is None,
     reason="SPRINT_METRICS_DB not set or psycopg unavailable",
 )
@@ -28,6 +28,8 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture()
 def conn():
+    if not DB_URL or psycopg is None:
+        pytest.skip("SPRINT_METRICS_DB not set or psycopg unavailable")
     connection = psycopg.connect(DB_URL)
     init_db(connection)
     connection.execute("DELETE FROM sprint_metrics.sprints")
@@ -165,36 +167,71 @@ def test_query_sprint_finished_card_not_superseded(conn):
     assert cards[0].superseded_because is None
 
 
-def test_upsert_fills_null_points_on_resend(conn):
+def test_upsert_fills_null_points_on_resend():
     """AC1: re-sending an event with points fills a NULL points column."""
-    conn.execute("DELETE FROM sprint_metrics.board_events WHERE card_id = 'c_fill'")
-    conn.commit()
-    insert_event(
-        conn,
-        {
-            "card_id": "c_fill",
-            "type": "finished",
-            "timestamp": "2024-01-07T15:00:00Z",
-            "sprint": "2024-01",
-            "card": {"created": "2024-01-01"},
-        },
-    )
-    insert_event(
-        conn,
-        {
-            "card_id": "c_fill",
-            "type": "finished",
-            "timestamp": "2024-01-07T15:00:00Z",
-            "sprint": "2024-01",
-            "card": {"created": "2024-01-01", "points": 5},
-        },
-    )
-    rows = conn.execute(
+    import re
+
+    from sprint_metrics.store import _DDL
+
+    select_sql = (
         "SELECT points FROM sprint_metrics.board_events "
         "WHERE card_id = 'c_fill' AND type = 'finished' AND event_time = '2024-01-07T15:00:00Z'"
-    ).fetchall()
-    assert len(rows) == 1
-    assert rows[0][0] == 5
+    )
+
+    # Validate that every column referenced in the WHERE clause exists in the DDL
+    m = re.search(
+        r"CREATE TABLE IF NOT EXISTS sprint_metrics\.board_events\s*\((.*?)\)\s*;",
+        _DDL,
+        re.DOTALL,
+    )
+    assert m, "board_events DDL not found in _DDL"
+    body = m.group(1)
+    cols = set()
+    for line in body.split("\n"):
+        line = line.strip()
+        if not line or line.startswith(("PRIMARY", "CONSTRAINT")):
+            continue
+        cols.add(line.split()[0])
+    where_part = select_sql.split("WHERE")[1]
+    referenced_cols = re.findall(r"(\w+)\s*=", where_part)
+    for col in referenced_cols:
+        assert col in cols, (
+            f"query references column '{col}' which does not exist in board_events; "
+            f"valid columns: {sorted(cols)}"
+        )
+
+    # Live-DB integration (skipped when SPRINT_METRICS_DB is not set)
+    if not DB_URL or psycopg is None:
+        pytest.skip("SPRINT_METRICS_DB not set or psycopg unavailable")
+    conn = psycopg.connect(DB_URL)
+    try:
+        conn.execute("DELETE FROM sprint_metrics.board_events WHERE card_id = 'c_fill'")
+        conn.commit()
+        insert_event(
+            conn,
+            {
+                "card_id": "c_fill",
+                "type": "finished",
+                "timestamp": "2024-01-07T15:00:00Z",
+                "sprint": "2024-01",
+                "card": {"created": "2024-01-01"},
+            },
+        )
+        insert_event(
+            conn,
+            {
+                "card_id": "c_fill",
+                "type": "finished",
+                "timestamp": "2024-01-07T15:00:00Z",
+                "sprint": "2024-01",
+                "card": {"created": "2024-01-01", "points": 5},
+            },
+        )
+        rows = conn.execute(select_sql).fetchall()
+        assert len(rows) == 1
+        assert rows[0][0] == 5
+    finally:
+        conn.close()
 
 
 def test_upsert_keeps_existing_points_on_resend(conn):
