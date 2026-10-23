@@ -31,6 +31,12 @@ CREATE TABLE IF NOT EXISTS sprint_metrics.board_events (
     because TEXT,
     epic TEXT,
     replaced_by JSONB,
+    card_created_at TIMESTAMPTZ,
+    model_seconds INT,
+    input_tokens BIGINT,
+    cached_input_tokens BIGINT,
+    output_tokens BIGINT,
+    reasoning_output_tokens BIGINT,
     PRIMARY KEY (card_id, type, event_time),
     CONSTRAINT board_events_type_check CHECK (
         type IN ('started', 'blocked', 'unblocked', 'finished', 'escalated', 'attempt_failed', 'superseded')
@@ -39,17 +45,6 @@ CREATE TABLE IF NOT EXISTS sprint_metrics.board_events (
         because IS NULL OR because IN ('sponsor', 'story_problem')
     )
 );
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS attempt_number INT;
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS points INT;
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS because TEXT;
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS epic TEXT;
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS replaced_by JSONB;
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS card_created_at TIMESTAMPTZ;
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS model_seconds INT;
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS input_tokens BIGINT;
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS cached_input_tokens BIGINT;
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS output_tokens BIGINT;
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS reasoning_output_tokens BIGINT;
 CREATE TABLE IF NOT EXISTS sprint_metrics.sprints (
     name TEXT PRIMARY KEY,
     start_date DATE NOT NULL,
