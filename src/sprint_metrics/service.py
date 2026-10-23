@@ -529,7 +529,7 @@ def _start_service(conn, port: int, db_url: str = "") -> int:
                                         escalations=count_escalated_events(conn_holder[0], label),
                                     )
                                     if label in has_events
-                                    else 0,
+                                    else None,
                                 }
                                 for label in sprints
                             ]
@@ -909,7 +909,12 @@ def _attach_range_cost(
     """
     for i, label in enumerate(labels):
         if label not in has_events:
-            result["sprints"][label] = _null_range_entry()
+            entry = result["sprints"][label]
+            for key in entry:
+                if key not in ("prior", "delta"):
+                    entry[key] = None
+            entry["story_costs"] = []
+            entry["cost"] = None
             continue
         entry = result["sprints"][label]
         story_costs, cost = _compute_cost_summary(sprints[label])

@@ -2472,13 +2472,15 @@ def test_post_valid_event_emits_info_log_record(monkeypatch):
     body includes card_id and event type."""
     import psycopg
     from opentelemetry._logs import SeverityNumber
-    from opentelemetry.sdk._logs.export.in_memory_log_exporter import InMemoryLogExporter
+    from opentelemetry.sdk._logs.export import InMemoryLogExporter
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
     from sprint_metrics.telemetry import init_telemetry
 
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4317")
     log_exporter = InMemoryLogExporter()
-    init_telemetry(log_exporter=log_exporter)
+    span_exporter = InMemorySpanExporter()
+    init_telemetry(span_exporter=span_exporter, log_exporter=log_exporter)
 
     conn = psycopg.connect(SPRINT_METRICS_DB)
     init_db(conn)
@@ -2509,13 +2511,15 @@ def test_post_invalid_type_emits_error_log_record(monkeypatch):
     body includes the invalid type value."""
     import psycopg
     from opentelemetry._logs import SeverityNumber
-    from opentelemetry.sdk._logs.export.in_memory_log_exporter import InMemoryLogExporter
+    from opentelemetry.sdk._logs.export import InMemoryLogExporter
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
     from sprint_metrics.telemetry import init_telemetry
 
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4317")
     log_exporter = InMemoryLogExporter()
-    init_telemetry(log_exporter=log_exporter)
+    span_exporter = InMemorySpanExporter()
+    init_telemetry(span_exporter=span_exporter, log_exporter=log_exporter)
 
     conn = psycopg.connect(SPRINT_METRICS_DB)
     init_db(conn)
@@ -3109,7 +3113,9 @@ def test_trend_doc_worked_example_matches_service_response():
         for entry in expected_values:
             sprint = entry["sprint"]
             value = entry["value"]
-            if metric == "throughput" and value > 0:
+            if value is None:
+                continue
+            if metric == "throughput":
                 for i in range(value):
                     card_id = f"doc_trend_{sprint}_{i}"
                     _post_events(
@@ -3132,6 +3138,36 @@ def test_trend_doc_worked_example_matches_service_response():
                             created=f"{sprint}-01",
                         ),
                     )
+            elif metric == "cycle_time_days":
+                from datetime import UTC, datetime, timedelta
+
+                card_id = f"doc_trend_{sprint}_0"
+                start_ts = f"{sprint}-03T10:00:00Z"
+                start_dt = datetime.strptime(start_ts, "%Y-%m-%dT%H:%M:%SZ").replace(
+                    tzinfo=UTC
+                )
+                end_dt = start_dt + timedelta(days=value)
+                end_ts = end_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+                _post_events(
+                    f"http://127.0.0.1:{port}/events",
+                    _make_event(
+                        card_id=card_id,
+                        event_type="started",
+                        timestamp=start_ts,
+                        sprint=sprint,
+                        created=f"{sprint}-01",
+                    ),
+                )
+                _post_events(
+                    f"http://127.0.0.1:{port}/events",
+                    _make_event(
+                        card_id=card_id,
+                        event_type="finished",
+                        timestamp=end_ts,
+                        sprint=sprint,
+                        created=f"{sprint}-01",
+                    ),
+                )
 
         status, body = _get_json(
             f"http://127.0.0.1:{port}/trend?metric={metric}&start={start}&end={end}"
