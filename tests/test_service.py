@@ -949,6 +949,8 @@ def test_sprint_flags_has_exactly_seven_boolean_keys():
         expected_flag_keys = {
             "cycle_time_days",
             "lead_time_days",
+            "cycle_time_minutes",
+            "lead_time_minutes",
             "throughput",
             "wip_violations",
             "blocked_aging_days",
@@ -2547,7 +2549,7 @@ def test_post_invalid_type_emits_error_log_record(monkeypatch):
         logs = log_exporter.get_finished_logs()
         matching = [ld for ld in logs if "frobnicated" in (ld.log_record.body or "")]
         assert len(matching) >= 1
-        assert matching[0].log_record.severity_number >= SeverityNumber.ERROR
+        assert matching[0].log_record.severity_number.value >= SeverityNumber.ERROR.value
     finally:
         conn.close()
 
@@ -3127,7 +3129,7 @@ def test_trend_doc_worked_example_matches_service_response():
         for entry in expected_values:
             sprint = entry["sprint"]
             value = entry["value"]
-            if metric == "throughput" and value > 0:
+            if metric == "throughput" and value is not None and value > 0:
                 for i in range(value):
                     card_id = f"doc_trend_{sprint}_{i}"
                     _post_events(
@@ -3901,6 +3903,8 @@ def test_get_sprint_free_form_label_only_started_event():
         expected_flag_keys = {
             "cycle_time_days",
             "lead_time_days",
+            "cycle_time_minutes",
+            "lead_time_minutes",
             "throughput",
             "wip_violations",
             "blocked_aging_days",

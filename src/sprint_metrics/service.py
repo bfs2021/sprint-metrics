@@ -529,7 +529,7 @@ def _start_service(conn, port: int, db_url: str = "") -> int:
                                         escalations=count_escalated_events(conn_holder[0], label),
                                     )
                                     if label in has_events
-                                    else None,
+                                    else 0,
                                 }
                                 for label in sprints
                             ]
