@@ -1,12 +1,11 @@
 services:
   workspace:
-    image: python:3.12-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
+    image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim@sha256:e5b65587bce7de595f299855d7385fe7fca39b8a74baa261ba1b7147afa78e58
     user: "nobody"
     environment:
       HOME: /tmp
-      PATH: "/tmp/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
     healthcheck:
-      test: ["CMD", "python", "--version"]
+      test: ["CMD", "uv", "--version"]
       interval: 10s
       timeout: 5s
       retries: 5
