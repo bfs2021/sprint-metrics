@@ -205,6 +205,7 @@ def test_upsert_fills_null_points_on_resend():
         return
     conn = psycopg.connect(DB_URL)
     try:
+        init_db(conn)
         conn.execute("DELETE FROM sprint_metrics.board_events WHERE card_id = 'c_fill'")
         conn.commit()
         insert_event(
