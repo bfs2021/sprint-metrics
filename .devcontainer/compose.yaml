@@ -18,6 +18,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: sprint_metrics
       PGDATA: /pgdata/data
+      PGHOST: /tmp
     command: ["postgres", "-k", "/tmp"]
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres", "-h", "127.0.0.1"]
