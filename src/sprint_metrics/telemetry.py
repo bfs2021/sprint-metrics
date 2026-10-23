@@ -45,7 +45,6 @@ def init_telemetry(span_exporter=None, log_exporter=None) -> None:
     provider = TracerProvider(resource=resource)
     if span_exporter is not None:
         provider.add_span_processor(SimpleSpanProcessor(span_exporter))
-        trace.set_tracer_provider(provider)
     elif log_exporter is None:
         from opentelemetry.exporter.otlp.proto.grpc.trace import OTLPSpanExporter
 
