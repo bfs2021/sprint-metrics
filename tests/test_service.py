@@ -2533,7 +2533,7 @@ def test_post_invalid_type_emits_error_log_record(monkeypatch):
         logs = log_exporter.get_finished_logs()
         matching = [ld for ld in logs if "frobnicated" in (ld.log_record.body or "")]
         assert len(matching) >= 1
-        assert matching[0].log_record.severity_number >= SeverityNumber.ERROR
+        assert matching[0].log_record.severity_number.value >= SeverityNumber.ERROR.value
     finally:
         conn.close()
 
@@ -7506,7 +7506,7 @@ def test_resend_event_keeps_existing_points_via_service():
 def test_trend_escalation_rate_percent_correct_value(monkeypatch):
     """AC1: GET /trend?metric=escalation_rate_percent&start=2024-01&end=2024-02 with
     sprint 2024-01 having no events and sprint 2024-02 having one card (started,
-    finished, escalated) returns 200 with values[0] = 0 (zero value for empty sprint)
+    finished, escalated) returns 200 with values[0] = None (null value for empty sprint)
     and values[1] = 100 (one escalation over one completed card)."""
     from datetime import date
 
@@ -7547,7 +7547,7 @@ def test_trend_escalation_rate_percent_correct_value(monkeypatch):
         )
         assert status == 200
         assert len(body["values"]) == 2
-        assert body["values"][0] == {"sprint": "2024-01", "value": 0}
+        assert body["values"][0] == {"sprint": "2024-01", "value": None}
         assert body["values"][1] == {"sprint": "2024-02", "value": 100}
     finally:
         pass
