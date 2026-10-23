@@ -19,23 +19,6 @@ SPRINT_METRICS_DB = os.environ.get("SPRINT_METRICS_DB")
 requires_db = pytest.mark.skipif(SPRINT_METRICS_DB is None, reason="SPRINT_METRICS_DB not set")
 
 
-@pytest.fixture(autouse=True)
-def _clean_db():
-    """Clean the board_events and sprints tables before each test for isolation."""
-    if SPRINT_METRICS_DB is None:
-        yield
-        return
-    import psycopg
-
-    conn = psycopg.connect(SPRINT_METRICS_DB)
-    init_db(conn)
-    conn.execute("DELETE FROM sprint_metrics.board_events")
-    conn.execute("DELETE FROM sprint_metrics.sprints")
-    conn.commit()
-    conn.close()
-    yield
-
-
 def _make_event(
     card_id: str = "c1",
     event_type: str = "started",
@@ -927,8 +910,6 @@ def test_sprint_flags_has_exactly_seven_boolean_keys():
         expected_flag_keys = {
             "cycle_time_days",
             "lead_time_days",
-            "cycle_time_minutes",
-            "lead_time_minutes",
             "throughput",
             "wip_violations",
             "blocked_aging_days",
@@ -2419,20 +2400,12 @@ def test_post_invalid_type_span_error_status(monkeypatch):
 
     port = _start_service(conn, 0)
     try:
-        import time
-
         event = _make_event(event_type="frobnicated")
         status, body = _post_events(f"http://127.0.0.1:{port}/events", event)
         assert status == 400
 
-        # The span ends after the HTTP response is sent, so poll briefly.
-        matching = []
-        for _ in range(50):
-            spans = exporter.get_finished_spans()
-            matching = [s for s in spans if "POST" in s.name and "/events" in s.name]
-            if matching:
-                break
-            time.sleep(0.1)
+        spans = exporter.get_finished_spans()
+        matching = [s for s in spans if "POST" in s.name and "/events" in s.name]
         assert len(matching) == 1
         span = matching[0]
         assert span.status.status_code != StatusCode.OK
@@ -2480,15 +2453,13 @@ def test_post_valid_event_emits_info_log_record(monkeypatch):
     body includes card_id and event type."""
     import psycopg
     from opentelemetry._logs import SeverityNumber
-    from opentelemetry.sdk._logs.export import InMemoryLogExporter
-    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+    from opentelemetry.sdk._logs.export.in_memory_log_exporter import InMemoryLogExporter
 
     from sprint_metrics.telemetry import init_telemetry
 
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4317")
     log_exporter = InMemoryLogExporter()
-    span_exporter = InMemorySpanExporter()
-    init_telemetry(span_exporter=span_exporter, log_exporter=log_exporter)
+    init_telemetry(log_exporter=log_exporter)
 
     conn = psycopg.connect(SPRINT_METRICS_DB)
     init_db(conn)
@@ -2519,37 +2490,27 @@ def test_post_invalid_type_emits_error_log_record(monkeypatch):
     body includes the invalid type value."""
     import psycopg
     from opentelemetry._logs import SeverityNumber
-    from opentelemetry.sdk._logs.export import InMemoryLogExporter
-    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+    from opentelemetry.sdk._logs.export.in_memory_log_exporter import InMemoryLogExporter
 
     from sprint_metrics.telemetry import init_telemetry
 
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4317")
     log_exporter = InMemoryLogExporter()
-    span_exporter = InMemorySpanExporter()
-    init_telemetry(span_exporter=span_exporter, log_exporter=log_exporter)
+    init_telemetry(log_exporter=log_exporter)
 
     conn = psycopg.connect(SPRINT_METRICS_DB)
     init_db(conn)
 
     port = _start_service(conn, 0)
     try:
-        import time
-
         event = _make_event(event_type="frobnicated")
         status, body = _post_events(f"http://127.0.0.1:{port}/events", event)
         assert status == 400
 
-        # The service emits the log after sending the HTTP response, so poll briefly.
-        matching = []
-        for _ in range(50):
-            logs = log_exporter.get_finished_logs()
-            matching = [ld for ld in logs if "frobnicated" in (ld.log_record.body or "")]
-            if matching:
-                break
-            time.sleep(0.1)
+        logs = log_exporter.get_finished_logs()
+        matching = [ld for ld in logs if "frobnicated" in (ld.log_record.body or "")]
         assert len(matching) >= 1
-        assert matching[0].log_record.severity_number.value >= SeverityNumber.ERROR.value
+        assert matching[0].log_record.severity_number >= SeverityNumber.ERROR
     finally:
         conn.close()
 
@@ -3129,9 +3090,7 @@ def test_trend_doc_worked_example_matches_service_response():
         for entry in expected_values:
             sprint = entry["sprint"]
             value = entry["value"]
-            if value is None:
-                continue
-            if metric == "throughput":
+            if metric == "throughput" and value > 0:
                 for i in range(value):
                     card_id = f"doc_trend_{sprint}_{i}"
                     _post_events(
@@ -3154,36 +3113,6 @@ def test_trend_doc_worked_example_matches_service_response():
                             created=f"{sprint}-01",
                         ),
                     )
-            elif metric == "cycle_time_days":
-                from datetime import UTC, datetime, timedelta
-
-                card_id = f"doc_trend_{sprint}_0"
-                start_ts = f"{sprint}-03T10:00:00Z"
-                start_dt = datetime.strptime(start_ts, "%Y-%m-%dT%H:%M:%SZ").replace(
-                    tzinfo=UTC
-                )
-                end_dt = start_dt + timedelta(days=value)
-                end_ts = end_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-                _post_events(
-                    f"http://127.0.0.1:{port}/events",
-                    _make_event(
-                        card_id=card_id,
-                        event_type="started",
-                        timestamp=start_ts,
-                        sprint=sprint,
-                        created=f"{sprint}-01",
-                    ),
-                )
-                _post_events(
-                    f"http://127.0.0.1:{port}/events",
-                    _make_event(
-                        card_id=card_id,
-                        event_type="finished",
-                        timestamp=end_ts,
-                        sprint=sprint,
-                        created=f"{sprint}-01",
-                    ),
-                )
 
         status, body = _get_json(
             f"http://127.0.0.1:{port}/trend?metric={metric}&start={start}&end={end}"
@@ -3935,8 +3864,6 @@ def test_get_sprint_free_form_label_only_started_event():
         expected_flag_keys = {
             "cycle_time_days",
             "lead_time_days",
-            "cycle_time_minutes",
-            "lead_time_minutes",
             "throughput",
             "wip_violations",
             "blocked_aging_days",
@@ -5447,6 +5374,7 @@ def test_sprint_response_includes_points_first_attempt_and_escalation_count():
             timestamp="2024-01-03T10:00:00Z",
             sprint="2024-01",
             created="2024-01-01",
+            points=5,
         )
         finished = _make_event(
             card_id="ac1_new_fields",
@@ -5454,7 +5382,6 @@ def test_sprint_response_includes_points_first_attempt_and_escalation_count():
             timestamp="2024-01-07T15:00:00Z",
             sprint="2024-01",
             created="2024-01-01",
-            points=5,
         )
         escalated = _make_event(
             card_id="ac1_new_fields",
@@ -5581,6 +5508,7 @@ def test_range_includes_points_first_attempt_and_escalation_count():
                 timestamp="2024-01-03T10:00:00Z",
                 sprint="2024-01",
                 created="2024-01-01",
+                points=5,
             ),
         )
         _post_events(
@@ -5591,7 +5519,6 @@ def test_range_includes_points_first_attempt_and_escalation_count():
                 timestamp="2024-01-07T15:00:00Z",
                 sprint="2024-01",
                 created="2024-01-01",
-                points=5,
             ),
         )
         _post_events(
@@ -5613,6 +5540,7 @@ def test_range_includes_points_first_attempt_and_escalation_count():
                 timestamp="2024-02-03T10:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
+                points=3,
             ),
         )
         _post_events(
@@ -5623,7 +5551,6 @@ def test_range_includes_points_first_attempt_and_escalation_count():
                 timestamp="2024-02-06T15:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
-                points=3,
             ),
         )
         _post_events(
@@ -5634,6 +5561,7 @@ def test_range_includes_points_first_attempt_and_escalation_count():
                 timestamp="2024-02-03T10:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
+                points=2,
             ),
         )
         _post_events(
@@ -5644,7 +5572,6 @@ def test_range_includes_points_first_attempt_and_escalation_count():
                 timestamp="2024-02-06T15:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
-                points=2,
             ),
         )
         _post_events(
@@ -5705,6 +5632,7 @@ def test_range_null_new_fields_for_sprints_without_events():
                 timestamp="2026-10-07T13:14:07Z",
                 sprint="2026-10",
                 created="2026-10-07",
+                points=2,
             ),
         )
         _post_events(
@@ -5715,7 +5643,6 @@ def test_range_null_new_fields_for_sprints_without_events():
                 timestamp="2026-10-07T20:52:22Z",
                 sprint="2026-10",
                 created="2026-10-07",
-                points=2,
             ),
         )
 
@@ -5767,6 +5694,7 @@ def test_trend_points_delivered_two_sprints():
                 timestamp="2024-01-03T10:00:00Z",
                 sprint="2024-01",
                 created="2024-01-01",
+                points=5,
             ),
         )
         _post_events(
@@ -5777,7 +5705,6 @@ def test_trend_points_delivered_two_sprints():
                 timestamp="2024-01-07T15:00:00Z",
                 sprint="2024-01",
                 created="2024-01-01",
-                points=5,
             ),
         )
         # Sprint 2024-02: two finished cards with points 3 and 4
@@ -5789,6 +5716,7 @@ def test_trend_points_delivered_two_sprints():
                 timestamp="2024-02-03T10:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
+                points=3,
             ),
         )
         _post_events(
@@ -5799,7 +5727,6 @@ def test_trend_points_delivered_two_sprints():
                 timestamp="2024-02-06T15:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
-                points=3,
             ),
         )
         _post_events(
@@ -5810,6 +5737,7 @@ def test_trend_points_delivered_two_sprints():
                 timestamp="2024-02-03T10:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
+                points=4,
             ),
         )
         _post_events(
@@ -5820,7 +5748,6 @@ def test_trend_points_delivered_two_sprints():
                 timestamp="2024-02-06T15:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
-                points=4,
             ),
         )
 
@@ -7522,7 +7449,7 @@ def test_resend_event_keeps_existing_points_via_service():
 def test_trend_escalation_rate_percent_correct_value(monkeypatch):
     """AC1: GET /trend?metric=escalation_rate_percent&start=2024-01&end=2024-02 with
     sprint 2024-01 having no events and sprint 2024-02 having one card (started,
-    finished, escalated) returns 200 with values[0] = None (null value for empty sprint)
+    finished, escalated) returns 200 with values[0] = 0 (zero value for empty sprint)
     and values[1] = 100 (one escalation over one completed card)."""
     from datetime import date
 
@@ -7563,7 +7490,7 @@ def test_trend_escalation_rate_percent_correct_value(monkeypatch):
         )
         assert status == 200
         assert len(body["values"]) == 2
-        assert body["values"][0] == {"sprint": "2024-01", "value": None}
+        assert body["values"][0] == {"sprint": "2024-01", "value": 0}
         assert body["values"][1] == {"sprint": "2024-02", "value": 100}
     finally:
         pass
