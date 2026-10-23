@@ -191,7 +191,7 @@ def test_upsert_fills_null_points_on_resend(conn):
     )
     rows = conn.execute(
         "SELECT points FROM sprint_metrics.board_events "
-        "WHERE card_id = 'c_fill' AND type = 'finished' AND timestamp = '2024-01-07T15:00:00Z'"
+        "WHERE card_id = 'c_fill' AND type = 'finished' AND event_time = '2024-01-07T15:00:00Z'"
     ).fetchall()
     assert len(rows) == 1
     assert rows[0][0] == 5
@@ -223,7 +223,7 @@ def test_upsert_keeps_existing_points_on_resend(conn):
     )
     rows = conn.execute(
         "SELECT points FROM sprint_metrics.board_events "
-        "WHERE card_id = 'c_keep' AND type = 'finished' AND timestamp = '2024-01-07T15:00:00Z'"
+        "WHERE card_id = 'c_keep' AND type = 'finished' AND event_time = '2024-01-07T15:00:00Z'"
     ).fetchall()
     assert len(rows) == 1
     assert rows[0][0] == 5
@@ -257,7 +257,7 @@ def test_upsert_fills_null_card_created_at_on_resend(conn):
     )
     rows = conn.execute(
         "SELECT card_created_at FROM sprint_metrics.board_events "
-        "WHERE card_id = 'c_created' AND type = 'started' AND timestamp = '2024-01-03T10:00:00Z'"
+        "WHERE card_id = 'c_created' AND type = 'started' AND event_time = '2024-01-03T10:00:00Z'"
     ).fetchall()
     assert len(rows) == 1
     assert rows[0][0] == datetime(2024, 1, 1, 8, 30, 0, tzinfo=UTC)

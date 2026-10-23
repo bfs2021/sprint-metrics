@@ -50,14 +50,6 @@ ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS input_tokens BI
 ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS cached_input_tokens BIGINT;
 ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS output_tokens BIGINT;
 ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS reasoning_output_tokens BIGINT;
-ALTER TABLE sprint_metrics.board_events DROP CONSTRAINT IF EXISTS board_events_type_check;
-ALTER TABLE sprint_metrics.board_events ADD CONSTRAINT board_events_type_check CHECK (
-    type IN ('started', 'blocked', 'unblocked', 'finished', 'escalated', 'attempt_failed', 'superseded')
-);
-ALTER TABLE sprint_metrics.board_events DROP CONSTRAINT IF EXISTS board_events_because_check;
-ALTER TABLE sprint_metrics.board_events ADD CONSTRAINT board_events_because_check CHECK (
-    because IS NULL OR because IN ('sponsor', 'story_problem')
-);
 CREATE TABLE IF NOT EXISTS sprint_metrics.sprints (
     name TEXT PRIMARY KEY,
     start_date DATE NOT NULL,
