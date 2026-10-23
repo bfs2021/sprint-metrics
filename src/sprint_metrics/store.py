@@ -45,12 +45,6 @@ CREATE TABLE IF NOT EXISTS sprint_metrics.board_events (
         because IS NULL OR because IN ('sponsor', 'story_problem')
     )
 );
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS card_created_at TIMESTAMPTZ;
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS model_seconds INT;
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS input_tokens BIGINT;
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS cached_input_tokens BIGINT;
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS output_tokens BIGINT;
-ALTER TABLE sprint_metrics.board_events ADD COLUMN IF NOT EXISTS reasoning_output_tokens BIGINT;
 CREATE TABLE IF NOT EXISTS sprint_metrics.sprints (
     name TEXT PRIMARY KEY,
     start_date DATE NOT NULL,
