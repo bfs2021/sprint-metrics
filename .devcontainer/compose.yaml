@@ -4,6 +4,7 @@ services:
     user: "nobody"
     environment:
       HOME: /tmp
+      PATH: "/tmp/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
     healthcheck:
       test: ["CMD", "python", "--version"]
       interval: 10s
@@ -16,10 +17,12 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: sprint_metrics
+      PGDATA: /pgdata/data
+    command: ["postgres", "-k", "/tmp"]
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "127.0.0.1"]
       interval: 10s
       timeout: 5s
       retries: 5
     tmpfs:
-      - /var/lib/postgresql/data
+      - /pgdata
