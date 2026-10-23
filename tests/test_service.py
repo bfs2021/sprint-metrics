@@ -19,6 +19,23 @@ SPRINT_METRICS_DB = os.environ.get("SPRINT_METRICS_DB")
 requires_db = pytest.mark.skipif(SPRINT_METRICS_DB is None, reason="SPRINT_METRICS_DB not set")
 
 
+@pytest.fixture(autouse=True)
+def _clean_db():
+    """Clean the board_events and sprints tables before each test for isolation."""
+    if SPRINT_METRICS_DB is None:
+        yield
+        return
+    import psycopg
+
+    conn = psycopg.connect(SPRINT_METRICS_DB)
+    init_db(conn)
+    conn.execute("DELETE FROM sprint_metrics.board_events")
+    conn.execute("DELETE FROM sprint_metrics.sprints")
+    conn.commit()
+    conn.close()
+    yield
+
+
 def _make_event(
     card_id: str = "c1",
     event_type: str = "started",
@@ -910,6 +927,8 @@ def test_sprint_flags_has_exactly_seven_boolean_keys():
         expected_flag_keys = {
             "cycle_time_days",
             "lead_time_days",
+            "cycle_time_minutes",
+            "lead_time_minutes",
             "throughput",
             "wip_violations",
             "blocked_aging_days",
@@ -3864,6 +3883,8 @@ def test_get_sprint_free_form_label_only_started_event():
         expected_flag_keys = {
             "cycle_time_days",
             "lead_time_days",
+            "cycle_time_minutes",
+            "lead_time_minutes",
             "throughput",
             "wip_violations",
             "blocked_aging_days",
@@ -5374,7 +5395,6 @@ def test_sprint_response_includes_points_first_attempt_and_escalation_count():
             timestamp="2024-01-03T10:00:00Z",
             sprint="2024-01",
             created="2024-01-01",
-            points=5,
         )
         finished = _make_event(
             card_id="ac1_new_fields",
@@ -5382,6 +5402,7 @@ def test_sprint_response_includes_points_first_attempt_and_escalation_count():
             timestamp="2024-01-07T15:00:00Z",
             sprint="2024-01",
             created="2024-01-01",
+            points=5,
         )
         escalated = _make_event(
             card_id="ac1_new_fields",
@@ -5508,7 +5529,6 @@ def test_range_includes_points_first_attempt_and_escalation_count():
                 timestamp="2024-01-03T10:00:00Z",
                 sprint="2024-01",
                 created="2024-01-01",
-                points=5,
             ),
         )
         _post_events(
@@ -5519,6 +5539,7 @@ def test_range_includes_points_first_attempt_and_escalation_count():
                 timestamp="2024-01-07T15:00:00Z",
                 sprint="2024-01",
                 created="2024-01-01",
+                points=5,
             ),
         )
         _post_events(
@@ -5540,7 +5561,6 @@ def test_range_includes_points_first_attempt_and_escalation_count():
                 timestamp="2024-02-03T10:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
-                points=3,
             ),
         )
         _post_events(
@@ -5551,6 +5571,7 @@ def test_range_includes_points_first_attempt_and_escalation_count():
                 timestamp="2024-02-06T15:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
+                points=3,
             ),
         )
         _post_events(
@@ -5561,7 +5582,6 @@ def test_range_includes_points_first_attempt_and_escalation_count():
                 timestamp="2024-02-03T10:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
-                points=2,
             ),
         )
         _post_events(
@@ -5572,6 +5592,7 @@ def test_range_includes_points_first_attempt_and_escalation_count():
                 timestamp="2024-02-06T15:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
+                points=2,
             ),
         )
         _post_events(
@@ -5632,7 +5653,6 @@ def test_range_null_new_fields_for_sprints_without_events():
                 timestamp="2026-10-07T13:14:07Z",
                 sprint="2026-10",
                 created="2026-10-07",
-                points=2,
             ),
         )
         _post_events(
@@ -5643,6 +5663,7 @@ def test_range_null_new_fields_for_sprints_without_events():
                 timestamp="2026-10-07T20:52:22Z",
                 sprint="2026-10",
                 created="2026-10-07",
+                points=2,
             ),
         )
 
@@ -5694,7 +5715,6 @@ def test_trend_points_delivered_two_sprints():
                 timestamp="2024-01-03T10:00:00Z",
                 sprint="2024-01",
                 created="2024-01-01",
-                points=5,
             ),
         )
         _post_events(
@@ -5705,6 +5725,7 @@ def test_trend_points_delivered_two_sprints():
                 timestamp="2024-01-07T15:00:00Z",
                 sprint="2024-01",
                 created="2024-01-01",
+                points=5,
             ),
         )
         # Sprint 2024-02: two finished cards with points 3 and 4
@@ -5716,7 +5737,6 @@ def test_trend_points_delivered_two_sprints():
                 timestamp="2024-02-03T10:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
-                points=3,
             ),
         )
         _post_events(
@@ -5727,6 +5747,7 @@ def test_trend_points_delivered_two_sprints():
                 timestamp="2024-02-06T15:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
+                points=3,
             ),
         )
         _post_events(
@@ -5737,7 +5758,6 @@ def test_trend_points_delivered_two_sprints():
                 timestamp="2024-02-03T10:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
-                points=4,
             ),
         )
         _post_events(
@@ -5748,6 +5768,7 @@ def test_trend_points_delivered_two_sprints():
                 timestamp="2024-02-06T15:00:00Z",
                 sprint="2024-02",
                 created="2024-02-01",
+                points=4,
             ),
         )
 
