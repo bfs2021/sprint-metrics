@@ -1,0 +1,11 @@
+{
+  "name": "sprint-metrics",
+  "dockerComposeFile": "compose.yaml",
+  "service": "workspace",
+  "containerEnv": {
+    "SPRINT_METRICS_DB": "postgresql://postgres:postgres@postgres:5432/sprint_metrics"
+  },
+  "setupCommands": [
+    ["sh", "-c", "pip install uv && uv sync --extra dev"]
+  ]
+}
