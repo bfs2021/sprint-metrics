@@ -2419,12 +2419,20 @@ def test_post_invalid_type_span_error_status(monkeypatch):
 
     port = _start_service(conn, 0)
     try:
+        import time
+
         event = _make_event(event_type="frobnicated")
         status, body = _post_events(f"http://127.0.0.1:{port}/events", event)
         assert status == 400
 
-        spans = exporter.get_finished_spans()
-        matching = [s for s in spans if "POST" in s.name and "/events" in s.name]
+        # The span ends after the HTTP response is sent, so poll briefly.
+        matching = []
+        for _ in range(50):
+            spans = exporter.get_finished_spans()
+            matching = [s for s in spans if "POST" in s.name and "/events" in s.name]
+            if matching:
+                break
+            time.sleep(0.1)
         assert len(matching) == 1
         span = matching[0]
         assert span.status.status_code != StatusCode.OK

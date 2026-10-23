@@ -200,9 +200,9 @@ def test_upsert_fills_null_points_on_resend():
             f"valid columns: {sorted(cols)}"
         )
 
-    # Live-DB integration (skipped when SPRINT_METRICS_DB is not set)
+    # Live-DB integration (runs only when SPRINT_METRICS_DB is set)
     if not DB_URL or psycopg is None:
-        pytest.skip("SPRINT_METRICS_DB not set or psycopg unavailable")
+        return
     conn = psycopg.connect(DB_URL)
     try:
         conn.execute("DELETE FROM sprint_metrics.board_events WHERE card_id = 'c_fill'")
