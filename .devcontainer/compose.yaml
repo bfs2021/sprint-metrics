@@ -4,9 +4,9 @@ services:
     user: "nobody"
     environment:
       HOME: /tmp
-    dns:
-      - 127.0.0.11
-      - 8.8.8.8
+    extra_hosts:
+      - "pypi.org:151.101.0.223"
+      - "files.pythonhosted.org:151.101.0.223"
     healthcheck:
       test: ["CMD", "uv", "--version"]
       interval: 10s
