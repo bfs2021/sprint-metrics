@@ -2,41 +2,26 @@
 
 from __future__ import annotations
 
-import inspect
+import opentelemetry.sdk._logs._internal as _internal
+import threading
 from pathlib import Path
-
-from opentelemetry.sdk._logs import LoggerProvider
-
-from sprint_metrics.telemetry import get_logger, init_telemetry
+from opentelemetry.context import get_value
 
 
-class _InMemoryLogExporter:
-    def __init__(self):
-        self._logs = []
+def test_dbg():
+    # find the recursion-count contextvar key
+    key = getattr(_internal, "_ON_EMIT_RECURSION_COUNT_KEY", None)
+    lines = [f"key type={type(key)} name={getattr(key, 'name', None)}"]
+    lines.append(f"main-thread cnt={get_value(key) if key is not None else 'nokey'}")
 
-    def export(self, logs):
-        self._logs.extend(logs)
+    def read_on_thread():
+        with open("tests/_dbg_thread.txt", "w") as f:
+            f.write(f"child cnt={get_value(key) if key is not None else 'nokey'}")
 
-    def flush(self):
-        pass
-
-    def shutdown(self):
-        pass
-
-    def get_finished_logs(self):
-        return list(self._logs)
-
-
-def test_dbg(monkeypatch):
-    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4317")
-    exporter = _InMemoryLogExporter()
-    init_telemetry(log_exporter=exporter)
-    logger = get_logger()
-    lines = [f"logger type={type(logger)}"]
-    lines.append("=== LoggerProvider.__init__ source ===")
-    try:
-        lines.append(inspect.getsource(LoggerProvider.__init__))
-    except Exception as exc:  # noqa: BLE001
-        lines.append(f"err {exc!r}")
+    t = threading.Thread(target=read_on_thread)
+    t.start()
+    t.join()
+    with open("tests/_dbg_thread.txt") as f:
+        lines.append(f.read())
     Path("tests/_dbg_out.txt").write_text("\n".join(lines))
     assert True
