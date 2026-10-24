@@ -106,6 +106,8 @@ def run(db_url: str | None = None, port: int = 8080) -> int:
 def _start_service(conn, port: int, db_url: str = "") -> int:
     """Start the HTTP server in a daemon thread and return the actual port."""
     conn_holder = [conn]
+    tracer = get_tracer()
+    logger = get_logger()
 
     class ServiceHandler(http.server.BaseHTTPRequestHandler):
         def _ensure_db(self) -> bool:
@@ -127,7 +129,6 @@ def _start_service(conn, port: int, db_url: str = "") -> int:
         def do_POST(self) -> None:  # noqa: N802
             route = self.path.split("?")[0]
             status = 500
-            tracer = get_tracer()
             with tracer.start_as_current_span(
                 f"POST {route}",
                 attributes={"http.method": "POST", "http.route": route},
@@ -235,6 +236,7 @@ def _start_service(conn, port: int, db_url: str = "") -> int:
                     if event_type not in VALID_EVENT_TYPES:
                         self._send_json(400, {"error": f"unknown event type: {event_type!r}"})
                         _emit_log(
+                            logger,
                             SeverityNumber.ERROR,
                             f"event rejected: unknown type {event_type}",
                             {"card_id": event["card_id"], "event_type": event_type},
@@ -303,6 +305,7 @@ def _start_service(conn, port: int, db_url: str = "") -> int:
                         return
 
                     _emit_log(
+                        logger,
                         SeverityNumber.INFO,
                         f"event accepted: card_id={event['card_id']} type={event_type}",
                         {"card_id": event["card_id"], "event_type": event_type},
@@ -316,7 +319,6 @@ def _start_service(conn, port: int, db_url: str = "") -> int:
         def do_GET(self) -> None:  # noqa: N802
             route = self.path.split("?")[0]
             status = 500
-            tracer = get_tracer()
             with tracer.start_as_current_span(
                 f"GET {route}",
                 attributes={"http.method": "GET", "http.route": route},
@@ -818,10 +820,9 @@ SERVICE_ENDPOINTS: list[tuple[str, str, str]] = [
 ]
 
 
-def _emit_log(severity: SeverityNumber, body: str, attributes: dict) -> None:
-    """Emit a structured log record via the configured OpenTelemetry logger."""
+def _emit_log(logger, severity: SeverityNumber, body: str, attributes: dict) -> None:
+    """Emit a structured log record via the provided OpenTelemetry logger."""
     try:
-        logger = get_logger()
         record = LogRecord(
             timestamp=int(time.time() * 1_000_000_000),
             observed_timestamp=None,

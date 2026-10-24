@@ -45,12 +45,13 @@ def init_telemetry(span_exporter=None, log_exporter=None) -> None:
     provider = TracerProvider(resource=resource)
     if span_exporter is not None:
         provider.add_span_processor(SimpleSpanProcessor(span_exporter))
-        trace.set_tracer_provider(provider)
     elif log_exporter is None:
+        # No span exporter was injected (the long-lived service path): export
+        # spans over OTLP. The import is deferred so an in-memory span exporter
+        # (tests) never pulls in the OTLP exporter.
         from opentelemetry.exporter.otlp.proto.grpc.trace import OTLPSpanExporter
 
         provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
-        trace.set_tracer_provider(provider)
     _tracer = provider.get_tracer("sprint-metrics")
 
     if log_exporter is not None:
@@ -61,6 +62,9 @@ def init_telemetry(span_exporter=None, log_exporter=None) -> None:
         log_provider.add_log_record_processor(SimpleLogRecordProcessor(log_exporter))
         _logger = log_provider.get_logger("sprint-metrics")
     elif span_exporter is None:
+        # No log exporter was injected (the long-lived service path): export
+        # logs over OTLP. The import is deferred so an in-memory log exporter
+        # (tests) never pulls in the OTLP exporter.
         from opentelemetry.exporter.otlp.proto.grpc._log import OTLPLogExporter
         from opentelemetry.sdk._logs import LoggerProvider
         from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
