@@ -1,142 +1,36 @@
-logger=281473355311936 type=<class 'opentelemetry.sdk._logs._internal.Logger'>
-is_enabled=True
-=== _is_enabled source ===
-    def _is_enabled(self) -> bool:
-        return self._logger_config.is_enabled
-
-=== Logger.emit source ===
-    def emit(
+logger=281473438206336
+_logger_config={'is_enabled': True}
+=== get_logger source ===
+    def get_logger(
         self,
-        record: LogRecord | None = None,
-        *,
-        timestamp: int | None = None,
-        observed_timestamp: int | None = None,
-        context: Context | None = None,
-        severity_number: SeverityNumber | None = None,
-        severity_text: str | None = None,
-        body: AnyValue | None = None,
+        name: str,
+        version: str | None = None,
+        schema_url: str | None = None,
         attributes: Attributes = None,
-        event_name: str | None = None,
-        exception: BaseException | None = None,
-    ) -> None:
-        """Emits the :class:`ReadWriteLogRecord` by setting instrumentation scope
-        and forwarding to the processor.
-        """
-        if not self._is_enabled():
-            return
-        # If a record is provided, use it directly
-        if record is not None:
-            if not isinstance(record, ReadWriteLogRecord):
-                if record.exception is not None:
-                    record = _copy_log_record_with_exception(record)
-                # pylint:disable=protected-access
-                writable_record = ReadWriteLogRecord._from_api_log_record(
-                    record=record,
-                    resource=self._resource,
-                    instrumentation_scope=self._instrumentation_scope,
-                    limits=self._log_record_limits,
-                )
-            else:
-                _set_log_record_exception_attributes(record.log_record)
-                writable_record = record
-        else:
-            # Create a record from individual parameters
-            log_record = _create_log_record_with_exception(
-                timestamp=timestamp,
-                observed_timestamp=observed_timestamp,
-                context=context,
-                severity_number=severity_number,
-                severity_text=severity_text,
-                body=body,
+    ) -> APILogger:
+        if self._disabled:
+            return NoOpLogger(
+                name,
+                version=version,
+                schema_url=schema_url,
                 attributes=attributes,
-                event_name=event_name,
-                exception=exception,
             )
-            # pylint:disable=protected-access
-            writable_record = ReadWriteLogRecord._from_api_log_record(
-                record=log_record,
-                resource=self._resource,
-                instrumentation_scope=self._instrumentation_scope,
-                limits=self._log_record_limits,
-            )
-
-        self._logger_metrics.emit_log()
-        self._multi_log_record_processor.on_emit(writable_record)
-
-=== SimpleLogRecordProcessor source ===
-class SimpleLogRecordProcessor(LogRecordProcessor):
-    """Implementation of LogRecordProcessor that exports logs synchronously.
-
-    This processor passes received logs directly to the configured
-    ``LogRecordExporter`` as soon as they are emitted.
-
-    This class serves as a reference implementation for custom log processors,
-    demonstrating proper error handling. Note how the ``on_emit`` method wraps
-    the exporter call in a try/except block to prevent exceptions from
-    propagating to the application.
-    """
-
-    def __init__(
-        self,
-        exporter: LogRecordExporter,
-        *,
-        meter_provider: MeterProvider | None = None,
-    ):
-        self._exporter = exporter
-        self._shutdown = False
-        self._metrics = create_processor_metrics(
-            "logs",
-            OtelComponentTypeValues.SIMPLE_LOG_PROCESSOR,
-            meter_provider or get_meter_provider(),
-            enabled=parse_boolean_environment_variable(OTEL_PYTHON_SDK_INTERNAL_METRICS_ENABLED),
+        logger = (
+            self._get_logger_cached(name, version, schema_url)
+            if attributes is None
+            else self._get_logger_no_cache(name, version, schema_url, attributes)
         )
+        with self._active_loggers_lock:
+            self._active_loggers.add(logger)
+        return logger
 
-    def on_emit(self, log_record: ReadWriteLogRecord):
-        # Prevent entering a recursive loop.
-        cnt = get_value(_ON_EMIT_RECURSION_COUNT_KEY) or 0
-        # Recursive depth of 3 is sort of arbitrary. It's possible that an Exporter.export call
-        # emits a log which returns us to this function, but when we call Exporter.export again the log
-        # is no longer emitted and we exit this recursive loop naturally, a depth of >3 allows 3
-        # recursive log calls but exits after because it's likely endless.
-        if cnt > 3:  # pyright: ignore[reportOperatorIssue]
-            _propagate_false_logger.warning(
-                "SimpleLogRecordProcessor.on_emit has entered a recursive loop. Dropping log and exiting the loop."
-            )
-            return
-        token = attach(
-            set_value(
-                _SUPPRESS_INSTRUMENTATION_KEY,
-                True,
-                set_value(_ON_EMIT_RECURSION_COUNT_KEY, cnt + 1),  # pyright: ignore[reportOperatorIssue]
-            )
-        )
-        try:
-            if self._shutdown:
-                _logger.warning("Processor is already shutdown, ignoring call")
-                self._metrics.drop_items(1, "already_shutdown")
-                return
-            # Convert ReadWriteLogRecord to ReadableLogRecord before exporting
-            # Note: resource should not be None at this point as it's set during Logger.emit()
-            resource = log_record.resource if log_record.resource is not None else Resource.create({})
-            readable_log_record = ReadableLogRecord(
-                log_record=log_record.log_record,
-                resource=resource,
-                instrumentation_scope=log_record.instrumentation_scope,
-                limits=log_record.limits,
-            )
-            # Record on submission to the exporter.
-            self._metrics.finish_items(1)
-            self._exporter.export((readable_log_record,))
-        except Exception:  # pylint: disable=broad-exception-caught
-            _logger.exception("Exception while exporting logs.")
-        finally:
-            detach(token)
+=== _LoggerConfig source ===
+@dataclass
+class _LoggerConfig:
+    is_enabled: bool = True
 
-    def shutdown(self):
-        self._shutdown = True
-        self._exporter.shutdown()
+    @classmethod
+    def default(cls) -> _LoggerConfig:
+        return _LoggerConfig()
 
-    def force_flush(self, timeout_millis: int = 30000) -> bool:  # pylint: disable=no-self-use
-        return True
-
-immediately=1
+Logger MRO: ['Logger', 'Logger', 'ABC', 'object']
