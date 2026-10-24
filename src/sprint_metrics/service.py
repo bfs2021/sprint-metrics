@@ -108,6 +108,9 @@ def _start_service(conn, port: int, db_url: str = "") -> int:
     conn_holder = [conn]
     tracer = get_tracer()
     logger = get_logger()
+    import sys
+
+    print(f"DBG start_service tracer={id(tracer)} logger={id(logger)}", file=sys.stderr)
 
     class ServiceHandler(http.server.BaseHTTPRequestHandler):
         def _ensure_db(self) -> bool:
@@ -822,6 +825,8 @@ SERVICE_ENDPOINTS: list[tuple[str, str, str]] = [
 
 def _emit_log(logger, severity: SeverityNumber, body: str, attributes: dict) -> None:
     """Emit a structured log record via the provided OpenTelemetry logger."""
+    import sys
+
     try:
         record = LogRecord(
             timestamp=int(time.time() * 1_000_000_000),
@@ -833,8 +838,9 @@ def _emit_log(logger, severity: SeverityNumber, body: str, attributes: dict) -> 
             attributes=attributes,
         )
         logger.emit(record)
-    except Exception:
-        pass
+        print(f"DBG emit ok logger={id(logger)} body={body!r}", file=sys.stderr)
+    except Exception as exc:
+        print(f"DBG emit FAIL logger={id(logger)} exc={exc!r}", file=sys.stderr)
 
 
 def _null_sprint_response() -> dict:
