@@ -1,4 +1,4 @@
-logger=281473703276816 type=<class 'opentelemetry.sdk._logs._internal.Logger'>
+logger=281472796715552 type=<class 'opentelemetry.sdk._logs._internal.Logger'>
 is_enabled=True
 === _is_enabled source ===
     def _is_enabled(self) -> bool:
