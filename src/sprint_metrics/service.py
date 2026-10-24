@@ -845,18 +845,30 @@ def _emit_log(logger, severity: SeverityNumber, body: str, attributes: dict) -> 
             except Exception as e:  # noqa: BLE001
                 return f"ERR:{type(e).__name__}"
 
-        enabled = _safe(lambda: logger._is_enabled())
+        from opentelemetry.context import get_value
+        from opentelemetry.sdk._logs.export import SimpleLogRecordProcessor
+
+        _key = SimpleLogRecordProcessor.on_emit.__globals__.get(
+            "_ON_EMIT_RECURSION_COUNT_KEY"
+        )
+        cnt = _safe(lambda: get_value(_key))
         proc = _safe(lambda: logger._multi_log_record_processor)
-        procs = _safe(
+        exp_info = _safe(
             lambda: [
-                (type(p).__name__, getattr(p, "_shutdown", None))
-                for p in getattr(proc, "_log_record_processors", [])
+                (
+                    type(p._exporter).__name__,
+                    id(p._exporter),
+                    len(p._exporter.get_finished_logs())
+                    if hasattr(p._exporter, "get_finished_logs")
+                    else None,
+                )
+                for p in proc._log_record_processors
             ]
-            if isinstance(proc, object) and not isinstance(proc, str)
+            if not isinstance(proc, str)
             else "n/a"
         )
         print(
-            f"DBG emit ok logger={id(logger)} enabled={enabled} proc={id(proc) if not isinstance(proc, str) else proc} procs={procs} body={body!r}",
+            f"DBG emit ok logger={id(logger)} cnt={cnt} exp={exp_info} body={body!r}",
             file=sys.stderr,
         )
     except Exception as exc:
