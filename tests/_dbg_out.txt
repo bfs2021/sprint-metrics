@@ -1,0 +1,6 @@
+logger=281473289701424 type=<class 'opentelemetry.sdk._logs._internal.Logger'>
+emit: ok
+immediately=1
+flush raised AttributeError("'Logger' object has no attribute 'flush'")
+after_flush=1
+after_sleep=1
