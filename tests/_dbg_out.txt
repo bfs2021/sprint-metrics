@@ -1,5 +1,9 @@
-logger=281473107765888 type=<class 'opentelemetry.sdk._logs._internal.Logger'>
-logger attrs: [('_name', 'sprint-metrics'), ('_version', None), ('_schema_url', ''), ('_attributes', {}), ('_resource', <opentelemetry.sdk.resources.Resource object at 0xffff90e5f0b0>), ('_multi_log_record_processor', <opentelemetry.sdk._logs._internal.SynchronousMultiLogRecordProcessor object at 0xffff909a28d0>), ('_instrumentation_scope', InstrumentationScope(sprint-metrics, None, , {})), ('_logger_metrics', <opentelemetry.sdk._logs._internal._logger_metrics.NoOpLoggerMetrics object at 0xffff90e10e00>), ('_logger_config', _LoggerConfig(is_enabled=True)), ('_log_record_limits', LogRecordLimits(max_attributes=128, max_attribute_length=None, max_log_record_attributes=128, max_log_record_attribute_length=None))]
+logger=281473397042176 type=<class 'opentelemetry.sdk._logs._internal.Logger'>
+is_enabled=True
+=== _is_enabled source ===
+    def _is_enabled(self) -> bool:
+        return self._logger_config.is_enabled
+
 === Logger.emit source ===
     def emit(
         self,

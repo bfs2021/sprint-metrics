@@ -36,7 +36,12 @@ def test_dbg_log_export(monkeypatch):
     init_telemetry(log_exporter=exporter)
     logger = get_logger()
     lines = [f"logger={id(logger)} type={type(logger)}"]
-    lines.append(f"logger attrs: {[(k, v) for k, v in vars(logger).items()]}")
+    lines.append(f"is_enabled={logger._is_enabled()}")
+    lines.append("=== _is_enabled source ===")
+    try:
+        lines.append(inspect.getsource(Logger._is_enabled))
+    except Exception as exc:  # noqa: BLE001
+        lines.append(f"no _is_enabled source {exc!r}")
     lines.append("=== Logger.emit source ===")
     try:
         lines.append(inspect.getsource(Logger.emit))
