@@ -838,11 +838,27 @@ def _emit_log(logger, severity: SeverityNumber, body: str, attributes: dict) -> 
             attributes=attributes,
         )
         logger.emit(record)
-        try:
-            enabled = logger._is_enabled()
-        except Exception:  # noqa: BLE001
-            enabled = "err"
-        print(f"DBG emit ok logger={id(logger)} enabled={enabled} body={body!r}", file=sys.stderr)
+
+        def _safe(fn):
+            try:
+                return fn()
+            except Exception as e:  # noqa: BLE001
+                return f"ERR:{type(e).__name__}"
+
+        enabled = _safe(lambda: logger._is_enabled())
+        proc = _safe(lambda: logger._multi_log_record_processor)
+        procs = _safe(
+            lambda: [
+                (type(p).__name__, getattr(p, "_shutdown", None))
+                for p in getattr(proc, "_log_record_processors", [])
+            ]
+            if isinstance(proc, object) and not isinstance(proc, str)
+            else "n/a"
+        )
+        print(
+            f"DBG emit ok logger={id(logger)} enabled={enabled} proc={id(proc) if not isinstance(proc, str) else proc} procs={procs} body={body!r}",
+            file=sys.stderr,
+        )
     except Exception as exc:
         print(f"DBG emit FAIL logger={id(logger)} exc={exc!r}", file=sys.stderr)
 
