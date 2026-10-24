@@ -838,7 +838,11 @@ def _emit_log(logger, severity: SeverityNumber, body: str, attributes: dict) -> 
             attributes=attributes,
         )
         logger.emit(record)
-        print(f"DBG emit ok logger={id(logger)} body={body!r}", file=sys.stderr)
+        try:
+            enabled = logger._is_enabled()
+        except Exception:  # noqa: BLE001
+            enabled = "err"
+        print(f"DBG emit ok logger={id(logger)} enabled={enabled} body={body!r}", file=sys.stderr)
     except Exception as exc:
         print(f"DBG emit FAIL logger={id(logger)} exc={exc!r}", file=sys.stderr)
 
