@@ -108,9 +108,6 @@ def _start_service(conn, port: int, db_url: str = "") -> int:
     conn_holder = [conn]
     tracer = get_tracer()
     logger = get_logger()
-    import sys
-
-    print(f"DBG start_service tracer={id(tracer)} logger={id(logger)}", file=sys.stderr)
 
     class ServiceHandler(http.server.BaseHTTPRequestHandler):
         def _ensure_db(self) -> bool:
@@ -130,6 +127,12 @@ def _start_service(conn, port: int, db_url: str = "") -> int:
                 return False
 
         def do_POST(self) -> None:  # noqa: N802
+            try:
+                self._handle_post()
+            finally:
+                self._flush_response()
+
+        def _handle_post(self) -> None:
             route = self.path.split("?")[0]
             status = 500
             with tracer.start_as_current_span(
@@ -825,8 +828,6 @@ SERVICE_ENDPOINTS: list[tuple[str, str, str]] = [
 
 def _emit_log(logger, severity: SeverityNumber, body: str, attributes: dict) -> None:
     """Emit a structured log record via the provided OpenTelemetry logger."""
-    import sys
-
     try:
         record = LogRecord(
             timestamp=int(time.time() * 1_000_000_000),
@@ -838,41 +839,8 @@ def _emit_log(logger, severity: SeverityNumber, body: str, attributes: dict) -> 
             attributes=attributes,
         )
         logger.emit(record)
-
-        def _safe(fn):
-            try:
-                return fn()
-            except Exception as e:  # noqa: BLE001
-                return f"ERR:{type(e).__name__}"
-
-        from opentelemetry.context import get_value
-        from opentelemetry.sdk._logs.export import SimpleLogRecordProcessor
-
-        _key = SimpleLogRecordProcessor.on_emit.__globals__.get(
-            "_ON_EMIT_RECURSION_COUNT_KEY"
-        )
-        cnt = _safe(lambda: get_value(_key))
-        proc = _safe(lambda: logger._multi_log_record_processor)
-        exp_info = _safe(
-            lambda: [
-                (
-                    type(p._exporter).__name__,
-                    id(p._exporter),
-                    len(p._exporter.get_finished_logs())
-                    if hasattr(p._exporter, "get_finished_logs")
-                    else None,
-                )
-                for p in proc._log_record_processors
-            ]
-            if not isinstance(proc, str)
-            else "n/a"
-        )
-        print(
-            f"DBG emit ok logger={id(logger)} cnt={cnt} exp={exp_info} body={body!r}",
-            file=sys.stderr,
-        )
-    except Exception as exc:
-        print(f"DBG emit FAIL logger={id(logger)} exc={exc!r}", file=sys.stderr)
+    except Exception:
+        pass
 
 
 def _null_sprint_response() -> dict:

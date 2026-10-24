@@ -41,9 +41,6 @@ def init_telemetry(span_exporter=None, log_exporter=None) -> None:
 
     service_name = os.environ.get("OTEL_SERVICE_NAME", _DEFAULT_SERVICE_NAME)
     resource = Resource({"service.name": service_name})
-    import sys
-
-    print(f"DBG init endpoint={endpoint!r} span_e={span_exporter is not None} log_e={log_exporter is not None}", file=sys.stderr)
 
     provider = TracerProvider(resource=resource)
     if span_exporter is not None:
@@ -64,9 +61,6 @@ def init_telemetry(span_exporter=None, log_exporter=None) -> None:
         log_provider = LoggerProvider(resource=resource)
         log_provider.add_log_record_processor(SimpleLogRecordProcessor(log_exporter))
         _logger = log_provider.get_logger("sprint-metrics")
-        import sys
-
-        print(f"DBG init BRANCH=log tracer={id(_tracer)} logger={id(_logger)} exporter={id(log_exporter)}", file=sys.stderr)
     elif span_exporter is None:
         # No log exporter was injected (the long-lived service path): export
         # logs over OTLP. The import is deferred so an in-memory log exporter
