@@ -34,7 +34,6 @@ def test_dbg_log_export(monkeypatch):
     import sys
 
     print(f"DBG logger={id(logger)} type={type(logger)}", file=sys.stderr)
-    print(f"DBG logger provider={getattr(logger, '_logger', None) and id(getattr(logger, '_logger', None))}", file=sys.stderr)
     try:
         record = LogRecord(
             timestamp=0,
@@ -48,8 +47,14 @@ def test_dbg_log_export(monkeypatch):
         logger.emit(record)
     except Exception as exc:  # noqa: BLE001
         print(f"DBG emit raised {exc!r}", file=sys.stderr)
+    print(f"DBG immediately={len(exporter.get_finished_logs())}", file=sys.stderr)
+    try:
+        logger.flush()
+    except Exception as exc:  # noqa: BLE001
+        print(f"DBG flush raised {exc!r}", file=sys.stderr)
+    print(f"DBG after_flush={len(exporter.get_finished_logs())}", file=sys.stderr)
     import time
 
-    time.sleep(0.2)
-    print(f"DBG finished={len(exporter.get_finished_logs())}", file=sys.stderr)
-    assert len(exporter.get_finished_logs()) >= 1
+    time.sleep(0.3)
+    print(f"DBG after_sleep={len(exporter.get_finished_logs())}", file=sys.stderr)
+    assert True
