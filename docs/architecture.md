@@ -18,14 +18,12 @@ C4Context
     System(sprintMetrics, "sprint-metrics", "Delivery metrics for the crew's board: a stateful event service in one Python package.")
     SystemDb(postgres, "Postgres", "A shared server; sprint-metrics keeps its history in its own schema, sprint_metrics.")
     System(otlp, "OTLP receiver", "Optional; receives the service's logs and traces when OTEL_EXPORTER_OTLP_ENDPOINT is set.")
-    System(prom, "Prometheus (or compatible scraper)", "Scrapes the service's /metrics.")
     System(gh, "GitHub", "Version tags vX.Y.Z, GitHub Releases, and the container image at ghcr.io/mqucifer/sprint-metrics.")
 
     Rel(crew, sprintMetrics, "runs the image", "docker")
     Rel(crew, sprintMetrics, "sends sprints and board events; queries ranges and trends", "HTTP")
     Rel(sprintMetrics, postgres, "persists board events and sprint definitions; answers queries from them", "psycopg, SPRINT_METRICS_DB")
     Rel(sprintMetrics, otlp, "emits logs and traces when configured", "OTLP")
-    Rel(prom, sprintMetrics, "scrapes /metrics", "HTTP GET")
     Rel(crew, gh, "pulls the image by its tag")
 ```
 
@@ -43,14 +41,12 @@ C4Container
     Person(crew, "The Crew")
     SystemDb(postgres, "Postgres", "Shared server. Owns the sprint_metrics schema: board_events (keyed by card_id, type, event_time) and sprints.")
     System(otlp, "OTLP receiver", "Optional.")
-    System(prom, "Prometheus", "Scrapes /metrics.")
 
     Boundary(boundary, "sprint-metrics", "Python 3.12 package, src/sprint_metrics; released at a tag and as a container image") {
-        Container(service, "Stateful service", "sprint_metrics.service", "Long-lived HTTP server on port 8080: POST /sprints and /events; GET /range, /trend, /metrics, /schema/event, /schema/trend, /health; GET /sprint answers 410. Requires a database.")
+        Container(service, "Stateful service", "sprint_metrics.service", "Long-lived HTTP server on port 8080: POST /sprints and /events; GET /range, /trend, /schema/event, /schema/trend, /health; GET /sprint and GET /metrics answer 410. Requires a database.")
     }
 
     Rel(crew, service, "POSTs board events and sprint definitions; GETs queries", "HTTP")
-    Rel(prom, service, "GET /metrics", "HTTP")
     Rel(service, postgres, "upserts events, queries from them; reconnects if the server restarts", "psycopg")
     Rel(service, otlp, "logs and traces, one span per request", "OTLP")
 ```
@@ -64,13 +60,13 @@ files. Only the service touches the database, and all SQL lives in `store.py`.
 C4Component
     title sprint-metrics — Components
     Boundary(pkg, "sprint_metrics package") {
-        Component(svc, "service.py", "Stateful HTTP service and the entry point (main) of the sprint-metrics script and python -m: event intake, sprint registration, range and trend queries, /metrics and /health.")
+        Component(svc, "service.py", "Stateful HTTP service and the entry point (main) of the sprint-metrics script and python -m: event intake, sprint registration, range and trend queries, and /health.")
         Component(card, "card.py", "Card dataclass and card parsing.")
         Component(metrics, "metrics.py", "Pure metric calculations: cycle time, lead time, throughput, WIP violations, blocked aging, escalation rate, first-attempt rate, failure breakdown and its top causes, cost metrics.")
         Component(thresholds, "thresholds.py", "Built-in default thresholds and flag calculation.")
-        Component(report, "report.py", "API_VERSION, the single-sprint JSON formatter, and the metric display names.")
+        Component(report, "report.py", "API_VERSION and the metric display names.")
         Component(sr, "sprint_range.py", "Sprint-label parsing and the per-sprint range JSON.")
-        Component(schema, "schema.py", "JSON Schema documents for the API: single-sprint, sprint-range, trend, and event intake.")
+        Component(schema, "schema.py", "JSON Schema documents for the API: sprint-range, trend, and event intake.")
         Component(store, "store.py", "Postgres persistence: the sprint_metrics schema DDL, idempotent event upsert, and the query functions. All SQL lives here.")
         Component(otel, "telemetry.py", "OpenTelemetry setup: tracer, logger, OTLP exporter, from OTEL_* environment variables.")
         Component(docgen, "_docs_gen.py", "Dev tool, not part of the public API: regenerates the marked (generated) sections of the docs/ files from the code.")
@@ -116,7 +112,7 @@ C4Component
   ADR 0002 and 0003 in [docs/decisions](decisions/).
 - **`_docs_gen.py` is a dev tool.** It keeps the marked sections of
   `docs/metrics.md`, `docs/thresholds.md`, and `docs/service.md` in step with
-  the code, and rewrites the four JSON Schema files in `schemas/`; it takes
+  the code, and rewrites the three JSON Schema files in `schemas/`; it takes
   no part in the running service.
 - **GET /trend is built but unused today.** Comparing sprints across a range
   is what this project is for, so the endpoint is to be made good, not

@@ -6,9 +6,14 @@
 
 ### Changed
 
+- The /range and /trend responses carry `api_version` "3"; version "2" is retired with the single-sprint answers this release removes. Event intake keeps `api_version` "1"
+
 ### Fixed
 
 ### Removed
+
+- GET /metrics endpoint: the service no longer offers its stored metrics as Prometheus text; GET /range and GET /trend answer them, and the endpoint now returns HTTP 410. docs/metrics.md drops its Prometheus-name column
+- The single-sprint response contract: `schemas/single-sprint.json`, the `SINGLE_SPRINT_SCHEMA` document, and the single-sprint JSON response formatter `format_json_report` (no longer re-exported by `sprint_metrics`), whose last consumer was the retired GET /sprint
 
 ## [2.0.0] - 2026-10-25
 

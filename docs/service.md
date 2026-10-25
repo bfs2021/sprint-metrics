@@ -55,11 +55,11 @@ Example cost payload on a finished event's card:
 
 ## Endpoints
 
-The service exposes the following HTTP endpoints: POST /sprints for sprint registration, POST /events for event intake, GET /range for multi-sprint queries, GET /trend for time-series queries, GET /metrics for Prometheus scraping, GET /schema/event for the event schema, and GET /health for liveness checks.
+The service exposes the following HTTP endpoints: POST /sprints for sprint registration, POST /events for event intake, GET /range for multi-sprint queries, GET /trend for time-series queries, GET /schema/event for the event schema, and GET /health for liveness checks.
 
 GET /range returns metrics for a range of sprints in chronological order. Each entry includes the prior-sprint delta. Its failure_breakdown and top_failure_causes count returns — one entry per return, by (failure class, returning role) — not one entry per failed story. Sprints with no events return all-null values.
 
-The /range and /trend responses carry their own `api_version`, separate from the intake's: it is "2" from release 2.0.0. Version "1" is retired: 2.0.0 changed what /range returns (each sprint carries `cost` and `story_costs`, and `top_failure_causes` is a list of `{class, role, count}` entries rather than an object), and the response version moves with any such change. Event intake keeps version "1".
+The /range and /trend responses carry their own `api_version`, separate from the intake's: it is "3" from release 3.0.0. The value moves whenever what the responses offer changes. Version "2" (release 2.0.0) is retired: 3.0.0 removed the single-sprint answers it still carried (GET /sprint and GET /metrics now answer 410, and the single-sprint response schema is gone). Version "1" was retired in 2.0.0, when /range gained `cost` and `story_costs` and `top_failure_causes` became a list of `{class, role, count}` entries. Event intake keeps its own version, "1".
 
 GET /trend answers the question 'what was this metric in each of these sprints?' by returning a value for every sprint label in the requested calendar range, with null for a sprint that has no events, so a gap reads as no data rather than zero (escalation_count and escalation_rate_percent give 0 there). The range is specified by explicit start and end labels consistent with /range: `GET /trend?metric=throughput&start=2024-01&end=2024-04`.
 
@@ -73,6 +73,8 @@ A request that fails validation (for example, a /range query whose start label i
 
 GET /sprint returns HTTP 410 with a JSON body identifying the endpoint as removed. The endpoint is gone; a range spanning one sprint (GET /range) answers the same question. The 410 is distinct from a transient condition (503), a validation failure (400), and a service bug (500); the caller should switch to GET /range and not retry.
 
+GET /metrics returns HTTP 410 with a JSON body identifying the endpoint as removed, with or without a query string and whether or not the database is reachable. The service no longer offers its stored metrics as Prometheus text; GET /range and GET /trend answer them.
+
 BEGIN:service
 Long-lived HTTP service that accepts board events and answers range and trend queries from Postgres.
 
@@ -82,7 +84,6 @@ Long-lived HTTP service that accepts board events and answers range and trend qu
 | POST | /events | Accept a board event (started, blocked, unblocked, finished, escalated, attempt_failed, superseded). The service validates the card's created date and event type. |
 | GET | /range | Return metrics for a range of sprints in chronological order. Each entry includes the prior-sprint delta. failure_breakdown and top_failure_causes count returns, one per return, by (failure class, returning role). Sprints with no events return all-null values. |
 | GET | /trend | Return a single metric across a sprint range. Returns a JSON object with api_version and an ordered sequence of sprint-label-to-value pairs (the values array). Valid metrics: cycle_time_days, lead_time_days, throughput, wip_violations, blocked_aging_days, escalation_rate_percent, first_attempt_rate_percent, points_delivered, first_attempt_numerator, first_attempt_denominator, escalation_count, superseded_count, superseded_points, superseded_breakdown, cycle_time_minutes, lead_time_minutes, model_minutes_middle, model_minutes_total, input_tokens_middle, input_tokens_total, output_tokens_middle, output_tokens_total, cached_input_percent, reasoning_output_percent. Minute-based metrics (cycle_time_minutes, lead_time_minutes) return JSON integer values in minutes (rounded); sprints with no events return JSON null. |
-| GET | /metrics | Return Prometheus text exposition format, one line per metric per sprint. Emits lines only for sprints that have at least one finished event. |
 | GET | /schema/event | Return the JSON Schema for the event intake body. |
 | GET | /health | Health check. Returns 200 with {"status": "ok"} when the database is reachable, 503 otherwise. |
 END:service

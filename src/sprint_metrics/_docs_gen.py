@@ -10,7 +10,6 @@ from sprint_metrics.metrics import ALL_METRICS
 from sprint_metrics.report import _METRIC_COLUMNS
 from sprint_metrics.schema import (
     EVENT_INTAKE_SCHEMA,
-    SINGLE_SPRINT_SCHEMA,
     SPRINT_RANGE_SCHEMA,
     TREND_SCHEMA,
 )
@@ -77,20 +76,13 @@ def _generate_metrics_content() -> str:
         ),
     }
 
-    prom_overrides: dict[str, str] = {
-        "failure_breakdown": "sprint_failure_count",
-        "superseded_count": "sprint_metrics_superseded_stories",
-        "superseded_points": "sprint_metrics_superseded_points",
-        "superseded_breakdown": "sprint_metrics_superseded_by_reason",
-    }
-
     display_overrides: dict[str, str] = {
         "superseded_count": "Superseded count",
     }
 
     lines = [
-        "| Display name | Metric key | Description | Prometheus name |",
-        "|---|---|---|---|",
+        "| Display name | Metric key | Description |",
+        "|---|---|---|",
     ]
     for metric_key in sorted(ALL_METRICS):
         display_name = display_overrides.get(metric_key, _METRIC_COLUMNS.get(metric_key))
@@ -104,8 +96,7 @@ def _generate_metrics_content() -> str:
                 continue
             func = getattr(metrics_mod, func_name)
             description = _first_doc_line(func)
-        prom_name = prom_overrides.get(metric_key, f"sprint_{metric_key}")
-        lines.append(f"| {display_name} | `{metric_key}` | {description} | `{prom_name}` |")
+        lines.append(f"| {display_name} | `{metric_key}` | {description} |")
     return "\n".join(lines) + "\n"
 
 
@@ -215,10 +206,9 @@ def main() -> int:
 
 
 def _generate_schema_files(output_dir: Path) -> None:
-    """Write the four JSON Schema files to the given directory."""
+    """Write the three JSON Schema files to the given directory."""
     output_dir.mkdir(parents=True, exist_ok=True)
     schemas = {
-        "single-sprint.json": SINGLE_SPRINT_SCHEMA,
         "sprint-range.json": SPRINT_RANGE_SCHEMA,
         "trend.json": TREND_SCHEMA,
         "event-intake.json": EVENT_INTAKE_SCHEMA,
