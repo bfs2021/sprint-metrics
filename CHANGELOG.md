@@ -13,6 +13,7 @@
 ### Removed
 
 - The CLI-only doc pages: docs/usage.md, docs/cards.md, docs/formats.md, docs/scrape.md
+- The `--thresholds` section from docs/thresholds.md; the README's install and usage stories retargeted to the released image; the service's startup example no longer takes `--service`
 
 ## [1.3.3] - 2026-10-19
 
