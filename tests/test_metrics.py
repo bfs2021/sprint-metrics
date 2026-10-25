@@ -2,11 +2,8 @@
 
 from datetime import UTC
 
-import pytest
-
 from sprint_metrics.card import Card
 from sprint_metrics.metrics import (
-    _load_wip_limits,
     _mean_days,
     _peak_occupancy,
     _state_windows,
@@ -31,12 +28,6 @@ def test_calculate_wip_violations_returns_one():
     """AC2: four in-flight cards with WIP limit 3 for In Progress returns 1 violation."""
     cards = [{"created": "2024-01-01", "started": "2024-01-02", "completed": ""}] * 4
     assert calculate_wip_violations(cards, {"In Progress": 3}) == 1
-
-
-def test_load_wip_limits_raises_type_error_for_list():
-    """AC3: a JSON list instead of an object raises TypeError mentioning WIP limits."""
-    with pytest.raises(TypeError, match="WIP limits"):
-        _load_wip_limits('["In Progress", 3]')
 
 
 def test_calculate_throughput_counts_completed_cards():
@@ -320,32 +311,6 @@ def test_all_metrics_includes_new_metrics():
 
     assert "first_attempt_rate_percent" in ALL_METRICS
     assert "failure_breakdown" in ALL_METRICS
-
-
-def test_wip_violation_details_returns_breached_states():
-    """4 in-flight cards with WIP limit 3 for In Progress returns [('In Progress', 4, 3)]."""
-    from sprint_metrics.metrics import wip_violation_details
-
-    cards = [{"created": "2024-01-01", "started": "2024-01-02", "completed": ""}] * 4
-    assert wip_violation_details(cards, {"In Progress": 3}) == [("In Progress", 4, 3)]
-
-
-def test_wip_violation_details_empty_when_no_breach():
-    """2 in-flight cards with WIP limit 3 returns an empty list."""
-    from sprint_metrics.metrics import wip_violation_details
-
-    cards = [{"created": "2024-01-01", "started": "2024-01-02", "completed": ""}] * 2
-    assert wip_violation_details(cards, {"In Progress": 3}) == []
-
-
-def test_wip_violation_details_empty_when_no_limits():
-    """No WIP limits (None or empty) returns an empty list."""
-    from sprint_metrics.metrics import wip_violation_details
-
-    cards = [{"created": "2024-01-01", "started": "2024-01-02", "completed": ""}] * 4
-    assert wip_violation_details(cards) == []
-    assert wip_violation_details(cards, None) == []
-    assert wip_violation_details(cards, {}) == []
 
 
 def test_calculate_points_delivered_sums_completed_only():

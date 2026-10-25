@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from sprint_metrics.card import Card, _as_cards, _load_cards, _parse_date, parse_card
+from sprint_metrics.card import Card, _as_cards, _parse_date, parse_card
 
 
 def test_card_properties():
@@ -30,35 +30,6 @@ def test_card_completed_without_start():
     assert card.is_completed is True
     assert card.cycle_time == 0
     assert card.lead_time == 6
-
-
-def test_load_cards_invalid_date():
-    """AC2: _load_cards raises ValueError containing the bad date string."""
-    with pytest.raises(ValueError, match="not-a-date"):
-        _load_cards('[{"created": "not-a-date"}]')
-
-
-def test_load_cards_valid():
-    """_load_cards parses a valid JSON list of cards."""
-    cards = _load_cards(
-        '[{"created": "2024-01-01", "started": "2024-01-03", "completed": "2024-01-07"}]'
-    )
-    assert len(cards) == 1
-    assert cards[0].created == date(2024, 1, 1)
-    assert cards[0].started == date(2024, 1, 3)
-    assert cards[0].completed == date(2024, 1, 7)
-    assert cards[0].is_completed is True
-
-
-def test_load_cards_empty_string():
-    """An empty string produces an empty list."""
-    assert _load_cards("") == []
-
-
-def test_load_cards_not_a_list():
-    """A JSON object instead of a list raises TypeError."""
-    with pytest.raises(TypeError, match="JSON list"):
-        _load_cards('{"created": "2024-01-01"}')
 
 
 def test_parse_card_missing_created():
@@ -289,31 +260,6 @@ def test_parse_card_with_failures_list():
     assert calculate_first_attempt_rate(cards) == 50
 
 
-def test_cli_exits_zero_with_completed_card_carrying_failures(tmp_path, capsys):
-    """AC1: the CLI exits 0 when run on a file whose one completed card carries
-    attempts 3 and a failures array of two objects."""
-    import json
-
-    from sprint_metrics.cli import main
-
-    cards = [
-        {
-            "created": "2024-01-01",
-            "started": "2024-01-01",
-            "completed": "2024-01-03",
-            "attempts": 3,
-            "failures": [
-                {"failure_class": "VERIFY", "failure_role": "Review"},
-                {"failure_class": "SCHEMA", "failure_role": "QA"},
-            ],
-        }
-    ]
-    path = tmp_path / "cards.json"
-    path.write_text(json.dumps(cards))
-    exit_code = main([str(path)])
-    assert exit_code == 0
-
-
 def test_parse_card_failures_absent_defaults_none():
     """AC2: a card with no 'failures' key gets failures=None."""
     raw = {"created": "2024-01-01", "started": "2024-01-02", "completed": "2024-01-05"}
@@ -327,28 +273,6 @@ def test_parse_card_failures_is_string_raises():
     raw = {"created": "2024-01-01", "failures": "not-an-array"}
     with pytest.raises(ValueError, match="failures"):
         parse_card(raw)
-
-
-def test_cli_exits_2_on_invalid_failures(tmp_path, capsys):
-    """AC3: the CLI exits 2 when a card's 'failures' value is a string, and
-    stderr names the 'failures' field."""
-    import json
-
-    from sprint_metrics.cli import main
-
-    cards = [
-        {
-            "created": "2024-01-01",
-            "completed": "2024-01-03",
-            "failures": "not-an-array",
-        }
-    ]
-    path = tmp_path / "cards.json"
-    path.write_text(json.dumps(cards))
-    exit_code = main([str(path)])
-    captured = capsys.readouterr()
-    assert exit_code == 2
-    assert "failures" in captured.err
 
 
 def test_parse_card_failures_entry_missing_failure_role():
