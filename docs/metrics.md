@@ -10,8 +10,6 @@ BEGIN:metrics
 | Cached input percent | `cached_input_percent` | Return the sprint's cached-input share of input tokens as a whole percent, or None when no story carries cost. |
 | Cycle time | `cycle_time_days` | Return the sprint's average cycle time and lead time, in whole days. |
 | Cycle time (min) | `cycle_time_minutes` | Return the mean cycle time in whole minutes over completed cards carrying sub-day timestamps. |
-| Escalation count | `escalation_count` | Return the number of escalated events in the sprint. |
-| Escalation rate | `escalation_rate_percent` | Return the escalation rate as a whole-number percentage of escalations over completed cards; 0 when no cards are completed. |
 | Top causes | `failure_breakdown` | Return the returns from review or QA, grouped by (failure class, returning role), sorted by count descending. |
 | First-attempt denominator | `first_attempt_denominator` | Return the total count of completed cards. |
 | First-attempt numerator | `first_attempt_numerator` | Return the count of completed cards whose attempts equals 1. |
@@ -121,21 +119,13 @@ all output tokens. Both percents are identical on every story in the
 
 A sprint with no completed cards reports 0 for cycle time, lead time,
 throughput, points delivered, first-attempt numerator, first-attempt
-denominator, escalation rate, and first-attempt rate. WIP violations is 0
+denominator, and first-attempt rate. WIP violations is 0
 when no WIP limits are configured.
 
 ### Points delivered for a card without a points value
 
 A completed card with no `points` value contributes 0 to the points
 delivered total.
-
-### Escalation count
-
-The escalation count is the number of escalated events in the sprint. It is
-the numerator behind the escalation-rate percentage, whose denominator is
-throughput. It reflects only the escalations parameter (CLI) or event count
-(service) regardless of whether any card is completed. It is 0 when no
-escalations are recorded.
 
 ### Cycle time for a card without a started date
 
@@ -154,11 +144,6 @@ defaults to today.
 WIP violations counts the number of states whose peak simultaneous
 occupancy exceeded the configured limit. A state with no configured limit
 cannot be in violation.
-
-### Escalation rate with no completed cards
-
-Escalation rate is 0 when no cards are completed, regardless of the
-escalation count.
 
 ### Superseded
 

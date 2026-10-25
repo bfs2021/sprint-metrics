@@ -28,7 +28,6 @@ from sprint_metrics.report import API_VERSION
 from sprint_metrics.schema import EVENT_INTAKE_SCHEMA, TREND_SCHEMA
 from sprint_metrics.sprint_range import _parse_sprint_label, format_sprint_range_json
 from sprint_metrics.store import (
-    count_escalated_events,
     init_db,
     insert_event,
     query_range,
@@ -42,6 +41,8 @@ from sprint_metrics.telemetry import get_logger, get_tracer, init_telemetry
 VALID_EVENT_TYPES = frozenset(
     {"started", "blocked", "unblocked", "finished", "escalated", "attempt_failed", "superseded"}
 )
+# Measures /trend once offered and now refuses with a 400 that says so.
+RETIRED_TREND_METRICS = frozenset({"escalation_rate_percent", "escalation_count"})
 REQUIRED_FIELDS = ("api_version", "card_id", "type", "timestamp", "sprint", "card")
 
 
@@ -427,12 +428,7 @@ def _start_service(conn, port: int, db_url: str = "") -> int:
                             self._send_json(500, {"error": f"database error: {exc}"})
                             status = 500
                             return
-                        sprint_escs = {
-                            lbl: count_escalated_events(conn_holder[0], lbl) for lbl in labels
-                        }
-                        body = format_sprint_range_json(
-                            sprints, labels, sprint_escalations=sprint_escs
-                        )
+                        body = format_sprint_range_json(sprints, labels)
                         result = json.loads(body)
                         _attach_range_cost(result, sprints, labels, has_events)
                         self._send_json(200, result)
@@ -447,6 +443,18 @@ def _start_service(conn, port: int, db_url: str = "") -> int:
                         if not metric or not start or not end:
                             self._send_json(
                                 400, {"error": "missing metric, start, or end parameter"}
+                            )
+                            status = 400
+                            return
+                        if metric in RETIRED_TREND_METRICS:
+                            self._send_json(
+                                400,
+                                {
+                                    "error": (
+                                        f"unknown metric: {metric!r} is no longer accepted; "
+                                        "the escalation measures were removed"
+                                    )
+                                },
                             )
                             status = 400
                             return
@@ -507,40 +515,15 @@ def _start_service(conn, port: int, db_url: str = "") -> int:
                             self._send_json(500, {"error": f"database error: {exc}"})
                             status = 500
                             return
-                        if metric == "escalation_count":
-                            values = [
-                                {
-                                    "sprint": label,
-                                    "value": count_escalated_events(conn_holder[0], label)
-                                    if label in has_events
-                                    else 0,
-                                }
-                                for label in sprints
-                            ]
-                        elif metric == "escalation_rate_percent":
-                            values = [
-                                {
-                                    "sprint": label,
-                                    "value": metric_value(
-                                        metric,
-                                        sprints[label],
-                                        escalations=count_escalated_events(conn_holder[0], label),
-                                    )
-                                    if label in has_events
-                                    else 0,
-                                }
-                                for label in sprints
-                            ]
-                        else:
-                            values = [
-                                {
-                                    "sprint": label,
-                                    "value": metric_value(metric, sprints[label])
-                                    if label in has_events
-                                    else None,
-                                }
-                                for label in sprints
-                            ]
+                        values = [
+                            {
+                                "sprint": label,
+                                "value": metric_value(metric, sprints[label])
+                                if label in has_events
+                                else None,
+                            }
+                            for label in sprints
+                        ]
                         response = {
                             "api_version": API_VERSION,
                             "metric": metric,
@@ -726,10 +709,10 @@ SERVICE_ENDPOINTS: list[tuple[str, str, str]] = [
         "Returns a JSON object with api_version and an ordered sequence of "
         "sprint-label-to-value pairs (the values array). "
         "Valid metrics: cycle_time_days, lead_time_days, throughput, "
-        "wip_violations, blocked_aging_days, escalation_rate_percent, "
+        "wip_violations, blocked_aging_days, "
         "first_attempt_rate_percent, points_delivered, "
         "first_attempt_numerator, first_attempt_denominator, "
-        "escalation_count, superseded_count, superseded_points, "
+        "superseded_count, superseded_points, "
         "superseded_breakdown, cycle_time_minutes, lead_time_minutes, "
         "model_minutes_middle, model_minutes_total, "
         "input_tokens_middle, input_tokens_total, "

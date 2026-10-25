@@ -695,7 +695,7 @@ def test_range_response_metrics_and_keys():
 
         status, body = _get_json(f"http://127.0.0.1:{port}/range?start=2024-01&end=2024-02")
         assert status == 200
-        assert body["api_version"] == "3"
+        assert body["api_version"] == "4"
         assert set(body["sprints"].keys()) == {"2024-01", "2024-02"}
         assert body["sprints"]["2024-01"]["throughput"] == 1
         assert body["sprints"]["2024-01"]["cycle_time_days"] == 4
@@ -1486,7 +1486,7 @@ def test_trend_cycle_time_three_sprints():
             assert "application/json" in resp.headers.get("Content-Type", "")
             body = json.loads(resp.read().decode())
 
-        assert body["api_version"] == "3"
+        assert body["api_version"] == "4"
         assert len(body["values"]) == 3
         assert body["values"][0] == {"sprint": "2024-02", "value": 3}
         assert body["values"][1] == {"sprint": "2024-03", "value": None}
@@ -1512,7 +1512,7 @@ def test_trend_empty_db_all_zeros():
             f"http://127.0.0.1:{port}/trend?metric=throughput&start=2024-01&end=2024-03"
         )
         assert status == 200
-        assert body["api_version"] == "3"
+        assert body["api_version"] == "4"
         assert len(body["values"]) == 3
         assert body["values"][0] == {"sprint": "2024-01", "value": None}
         assert body["values"][1] == {"sprint": "2024-02", "value": None}
@@ -1629,7 +1629,7 @@ def test_trend_first_attempt_rate_two_sprints():
             f"&start=2024-01&end=2024-02"
         )
         assert status == 200
-        assert body["api_version"] == "3"
+        assert body["api_version"] == "4"
         assert len(body["values"]) == 2
         assert body["values"][0]["sprint"] == "2024-01"
         assert body["values"][0]["value"] == 100
@@ -3954,7 +3954,7 @@ def test_sprint_response_includes_points_first_attempt_and_escalation_count():
         assert sprint_data["points_delivered"] == 5
         assert sprint_data["first_attempt_numerator"] == 1
         assert sprint_data["first_attempt_denominator"] == 1
-        assert sprint_data["escalation_count"] == 1
+        assert "escalation_count" not in sprint_data
         assert "throughput" in sprint_data
         assert "first_attempt_rate_percent" in sprint_data
     finally:
@@ -3980,7 +3980,7 @@ def test_sprint_no_events_new_fields_are_null():
         assert sprint_data["points_delivered"] is None
         assert sprint_data["first_attempt_numerator"] is None
         assert sprint_data["first_attempt_denominator"] is None
-        assert sprint_data["escalation_count"] is None
+        assert "escalation_count" not in sprint_data
         assert sprint_data["throughput"] is None
         assert sprint_data["first_attempt_rate_percent"] is None
     finally:
@@ -4033,7 +4033,7 @@ def test_sprint_escalations_counted_without_completions():
         assert sprint_data["points_delivered"] == 0
         assert sprint_data["first_attempt_numerator"] == 0
         assert sprint_data["first_attempt_denominator"] == 0
-        assert sprint_data["escalation_count"] == 2
+        assert "escalation_count" not in sprint_data
     finally:
         conn.close()
 
@@ -4150,12 +4150,12 @@ def test_range_includes_points_first_attempt_and_escalation_count():
         assert s01["points_delivered"] == 5
         assert s01["first_attempt_numerator"] == 1
         assert s01["first_attempt_denominator"] == 1
-        assert s01["escalation_count"] == 1
+        assert "escalation_count" not in s01
         # 2024-02: points 5 (3+2), first-attempt 2/2, escalation 1
         assert s02["points_delivered"] == 5
         assert s02["first_attempt_numerator"] == 2
         assert s02["first_attempt_denominator"] == 2
-        assert s02["escalation_count"] == 1
+        assert "escalation_count" not in s02
         # Both entries still contain existing keys and prior and delta
         for s in (s01, s02):
             for key in ("throughput", "cycle_time_days", "prior", "delta"):
@@ -4212,13 +4212,220 @@ def test_range_null_new_fields_for_sprints_without_events():
         assert s10["points_delivered"] == 2
         assert s10["first_attempt_numerator"] == 1
         assert s10["first_attempt_denominator"] == 1
-        assert s10["escalation_count"] == 0
+        assert "escalation_count" not in s10
         # 2026-11 and 2026-12 have nulls
         for s in (s11, s12):
             assert s["points_delivered"] is None
             assert s["first_attempt_numerator"] is None
             assert s["first_attempt_denominator"] is None
-            assert s["escalation_count"] is None
+            assert "escalation_count" not in s
+    finally:
+        conn.close()
+
+
+@requires_db
+def test_range_carries_no_escalation_keys_in_entry_prior_or_delta():
+    """#774 AC1-AC3, AC5: with 2 escalated events and 1 completed card in the later
+    sprint, /range carries no escalation key in any entry, prior or delta, keeps
+    every kept measure, and an event-free sprint still answers null for them."""
+    import psycopg
+
+    conn = psycopg.connect(SPRINT_METRICS_DB)
+    init_db(conn)
+
+    port = _start_service(conn, 0)
+    try:
+        events = [
+            ("e1", "started", "2024-01-03T10:00:00Z", "2024-01"),
+            ("e1", "finished", "2024-01-05T10:00:00Z", "2024-01"),
+            ("e2", "started", "2024-02-03T10:00:00Z", "2024-02"),
+            ("e2", "escalated", "2024-02-04T10:00:00Z", "2024-02"),
+            ("e2", "escalated", "2024-02-05T10:00:00Z", "2024-02"),
+            ("e2", "finished", "2024-02-06T10:00:00Z", "2024-02"),
+        ]
+        for event in events:
+            status, _ = _post_events(f"http://127.0.0.1:{port}/events", _make_event(*event))
+            assert status == 200
+
+        status, body = _get_json(f"http://127.0.0.1:{port}/range?start=2024-01&end=2024-03")
+        assert status == 200
+        labels = ("2024-01", "2024-02", "2024-03")
+        first, later, empty = (body["sprints"][label] for label in labels)
+        assert first["prior"] is None and first["delta"] is None
+        for part in (first, later, empty, later["prior"], later["delta"]):
+            assert "escalation_rate_percent" not in part
+            assert "escalation_count" not in part
+        kept = (
+            "cycle_time_days",
+            "lead_time_days",
+            "throughput",
+            "wip_violations",
+            "blocked_aging_days",
+            "points_delivered",
+            "first_attempt_numerator",
+            "first_attempt_denominator",
+            "first_attempt_rate_percent",
+            "superseded_count",
+            "superseded_points",
+            "superseded_breakdown",
+            "cycle_time_minutes",
+            "lead_time_minutes",
+            "failure_breakdown",
+            "top_failure_causes",
+            "story_costs",
+            "cost",
+        )
+        for key in kept:
+            assert key in later
+        assert later["throughput"] == 1
+        assert later["cycle_time_days"] == 3
+        for key in ("cycle_time_days", "throughput", "points_delivered", "first_attempt_rate_percent"):
+            assert empty[key] is None
+    finally:
+        conn.close()
+
+
+@requires_db
+def test_range_flags_do_not_depend_on_escalated_events():
+    """#775 AC1, AC3: two sprints identical in every kept measure, one with 3
+    escalated events, answer identical flags, each with exactly the eight kept
+    measures and no escalation key."""
+    import psycopg
+
+    conn = psycopg.connect(SPRINT_METRICS_DB)
+    init_db(conn)
+
+    port = _start_service(conn, 0)
+    try:
+        events = []
+        for sprint in ("2024-01", "2024-02"):
+            card = f"f-{sprint}"
+            events.append((card, "started", f"{sprint}-03T10:00:00Z", sprint, f"{sprint}-01"))
+            events.append((card, "finished", f"{sprint}-05T10:00:00Z", sprint, f"{sprint}-01"))
+        for hour in ("11", "12", "13"):
+            timestamp = f"2024-02-04T{hour}:00:00Z"
+            events.append(("f-2024-02", "escalated", timestamp, "2024-02", "2024-02-01"))
+        for event in events:
+            status, _ = _post_events(f"http://127.0.0.1:{port}/events", _make_event(*event))
+            assert status == 200
+
+        status, body = _get_json(f"http://127.0.0.1:{port}/range?start=2024-01&end=2024-02")
+        assert status == 200
+        quiet, escalated = body["sprints"]["2024-01"]["flags"], body["sprints"]["2024-02"]["flags"]
+        assert quiet == escalated
+        assert sorted(escalated) == sorted(
+            [
+                "cycle_time_days",
+                "lead_time_days",
+                "cycle_time_minutes",
+                "lead_time_minutes",
+                "throughput",
+                "wip_violations",
+                "blocked_aging_days",
+                "first_attempt_rate_percent",
+            ]
+        )
+    finally:
+        conn.close()
+
+
+@requires_db
+@pytest.mark.parametrize("metric", ["escalation_rate_percent", "escalation_count"])
+def test_trend_refuses_the_escalation_measures(metric):
+    """#776 AC1: GET /trend for either escalation measure answers 400 naming the
+    measure and saying it is no longer accepted, with no retryable flag."""
+    import psycopg
+
+    conn = psycopg.connect(SPRINT_METRICS_DB)
+    init_db(conn)
+
+    port = _start_service(conn, 0)
+    try:
+        status, body = _get_json(
+            f"http://127.0.0.1:{port}/trend?metric={metric}&start=2024-01&end=2024-02"
+        )
+        assert status == 400
+        assert metric in body["error"]
+        assert "no longer accepted" in body["error"]
+        assert "retryable" not in body
+    finally:
+        conn.close()
+
+
+@requires_db
+def test_trend_answers_api_version_4_and_still_refuses_escalation_count():
+    """#778 AC2: a kept-metric /trend answers 200 with api_version "4" and null
+    for an event-free sprint, and escalation_count still answers 400."""
+    import psycopg
+
+    conn = psycopg.connect(SPRINT_METRICS_DB)
+    init_db(conn)
+
+    port = _start_service(conn, 0)
+    base = f"http://127.0.0.1:{port}"
+    try:
+        for event in (
+            ("v1", "started", "2024-01-03T10:00:00Z"),
+            ("v1", "finished", "2024-01-05T10:00:00Z"),
+        ):
+            assert _post_events(f"{base}/events", _make_event(*event))[0] == 200
+        status, body = _get_json(f"{base}/trend?metric=throughput&start=2024-01&end=2024-02")
+        assert status == 200
+        assert body["api_version"] == "4"
+        assert body["values"] == [
+            {"sprint": "2024-01", "value": 1},
+            {"sprint": "2024-02", "value": None},
+        ]
+        status, _ = _get_json(f"{base}/trend?metric=escalation_count&start=2024-01&end=2024-02")
+        assert status == 400
+    finally:
+        conn.close()
+
+
+def test_trend_accepts_no_escalation_measure():
+    """#776 AC3, AC4: neither escalation name is an accepted trend metric, and the
+    /trend endpoint description no longer lists them."""
+    from sprint_metrics.metrics import ALL_METRICS
+    from sprint_metrics.service import SERVICE_ENDPOINTS
+
+    assert "escalation_rate_percent" not in ALL_METRICS
+    assert "escalation_count" not in ALL_METRICS
+    trend = next(desc for method, path, desc in SERVICE_ENDPOINTS if path == "/trend")
+    assert "escalation" not in trend
+
+
+@requires_db
+def test_escalated_event_is_stored_but_feeds_no_response():
+    """#777 AC3: an escalated event is accepted and stored as before, but no
+    /range field and no kept /trend value depends on it."""
+    import psycopg
+
+    conn = psycopg.connect(SPRINT_METRICS_DB)
+    init_db(conn)
+
+    port = _start_service(conn, 0)
+    base = f"http://127.0.0.1:{port}"
+    try:
+        for event in (
+            ("x1", "started", "2024-01-03T10:00:00Z"),
+            ("x1", "finished", "2024-01-05T10:00:00Z"),
+        ):
+            assert _post_events(f"{base}/events", _make_event(*event))[0] == 200
+        _, range_before = _get_json(f"{base}/range?start=2024-01&end=2024-01")
+        _, trend_before = _get_json(f"{base}/trend?metric=throughput&start=2024-01&end=2024-01")
+
+        escalated = _make_event("x1", "escalated", "2024-01-04T10:00:00Z")
+        assert _post_events(f"{base}/events", escalated) == (200, {})
+        stored = conn.execute(
+            "SELECT COUNT(*) FROM sprint_metrics.board_events WHERE type = 'escalated'"
+        ).fetchone()[0]
+        assert stored == 1
+
+        _, range_after = _get_json(f"{base}/range?start=2024-01&end=2024-01")
+        _, trend_after = _get_json(f"{base}/trend?metric=throughput&start=2024-01&end=2024-01")
+        assert range_after == range_before
+        assert trend_after == trend_before
+        assert "escalation_count" not in range_after["sprints"]["2024-01"]
     finally:
         conn.close()
 
@@ -4316,7 +4523,7 @@ def test_trend_points_delivered_two_sprints():
             assert "application/json" in resp.headers.get("Content-Type", "")
             body = json.loads(resp.read().decode())
 
-        assert body["api_version"] == "3"
+        assert body["api_version"] == "4"
         assert len(body["values"]) == 2
         assert body["values"][0] == {"sprint": "2024-01", "value": 5}
         assert body["values"][1] == {"sprint": "2024-02", "value": 7}
@@ -4394,47 +4601,6 @@ def test_trend_first_attempt_denominator_two_sprints():
         assert len(body["values"]) == 2
         assert body["values"][0] == {"sprint": "2024-01", "value": 3}
         assert body["values"][1] == {"sprint": "2024-02", "value": 5}
-    finally:
-        conn.close()
-
-
-@requires_db
-def test_trend_escalation_count_zero_fill():
-    """AC3+AC6: GET /trend?metric=escalation_count&start=2024-01&end=2024-02 with
-    sprint 2024-01 having no stored events and sprint 2024-02 having one escalated
-    event (but no finished events) returns 200 and values has 2024-01 value 0
-    (the escalation count is 0 when no escalated events are stored) and
-    2024-02 value 1."""
-    import psycopg
-
-    conn = psycopg.connect(SPRINT_METRICS_DB)
-    init_db(conn)
-    conn.execute("DELETE FROM sprint_metrics.board_events WHERE card_id = 'ac3_esc'")
-    conn.execute("DELETE FROM sprint_metrics.board_events WHERE sprint IN ('2024-01', '2024-02')")
-    conn.commit()
-
-    port = _start_service(conn, 0)
-    try:
-        # Sprint 2024-02: one escalated event (no finished events)
-        _post_events(
-            f"http://127.0.0.1:{port}/events",
-            _make_event(
-                card_id="ac3_esc",
-                event_type="escalated",
-                timestamp="2024-02-05T10:00:00Z",
-                sprint="2024-02",
-                created="2024-02-01",
-            ),
-        )
-        # Sprint 2024-01: no events
-
-        status, body = _get_json(
-            f"http://127.0.0.1:{port}/trend?metric=escalation_count&start=2024-01&end=2024-02"
-        )
-        assert status == 200
-        assert len(body["values"]) == 2
-        assert body["values"][0] == {"sprint": "2024-01", "value": 0}
-        assert body["values"][1] == {"sprint": "2024-02", "value": 1}
     finally:
         conn.close()
 
@@ -5126,7 +5292,7 @@ def test_trend_superseded_count_three_sprints():
             assert "application/json" in resp.headers.get("Content-Type", "")
             body = json.loads(resp.read().decode())
 
-        assert body["api_version"] == "3"
+        assert body["api_version"] == "4"
         assert len(body["values"]) == 3
         assert body["values"][0] == {"sprint": "2024-01", "value": 1}
         assert body["values"][1] == {"sprint": "2024-02", "value": 1}
@@ -5898,111 +6064,10 @@ def test_resend_event_keeps_existing_points_via_service():
         conn.close()
 
 
-def test_trend_escalation_rate_percent_correct_value(monkeypatch):
-    """AC1: GET /trend?metric=escalation_rate_percent&start=2024-01&end=2024-02 with
-    sprint 2024-01 having no events and sprint 2024-02 having one card (started,
-    finished, escalated) returns 200 with values[0] = 0 (zero value for empty sprint)
-    and values[1] = 100 (one escalation over one completed card)."""
-    from datetime import date
-
-    from sprint_metrics import service
-    from sprint_metrics.card import Card
-
-    cards_2024_02 = [
-        Card(
-            created=date(2024, 2, 1),
-            started=date(2024, 2, 3),
-            completed=date(2024, 2, 7),
-        )
-    ]
-    sprints_data = {
-        "2024-01": [],
-        "2024-02": cards_2024_02,
-    }
-    escalation_counts = {"2024-01": 0, "2024-02": 1}
-    has_events = {"2024-01": False, "2024-02": True}
-
-    monkeypatch.setattr(service, "resolve_sprint_range", lambda conn, start, end: None)
-    monkeypatch.setattr(service, "query_range", lambda conn, start, end: sprints_data)
-    monkeypatch.setattr(service, "sprint_has_events", lambda conn, label: has_events[label])
-    monkeypatch.setattr(
-        service, "count_escalated_events", lambda conn, label: escalation_counts[label]
-    )
-
-    class FakeConn:
-        def execute(self, sql, params=()):
-            if "SELECT 1" in sql:
-                return _FakeSprintCursor([(1,)])
-            raise AssertionError(f"unexpected SQL: {sql}")
-
-    port = _start_service(FakeConn(), 0)
-    try:
-        status, body = _get_json(
-            f"http://127.0.0.1:{port}/trend?metric=escalation_rate_percent&start=2024-01&end=2024-02"
-        )
-        assert status == 200
-        assert len(body["values"]) == 2
-        assert body["values"][0] == {"sprint": "2024-01", "value": 0}
-        assert body["values"][1] == {"sprint": "2024-02", "value": 100}
-    finally:
-        pass
-
-
-def test_trend_escalation_rate_percent_matches_range(monkeypatch):
-    """AC2: For the same sprint data, /trend's escalation_rate_percent value equals
-    /range's escalation_rate_percent for that sprint (both 100)."""
-    from datetime import date
-
-    from sprint_metrics import service
-    from sprint_metrics.card import Card
-
-    cards_2024_02 = [
-        Card(
-            created=date(2024, 2, 1),
-            started=date(2024, 2, 3),
-            completed=date(2024, 2, 7),
-        )
-    ]
-    sprints_data = {"2024-02": cards_2024_02}
-    escalation_counts = {"2024-02": 1}
-    has_events = {"2024-02": True}
-
-    monkeypatch.setattr(service, "resolve_sprint_range", lambda conn, start, end: None)
-    monkeypatch.setattr(service, "query_range", lambda conn, start, end: sprints_data)
-    monkeypatch.setattr(service, "sprint_has_events", lambda conn, label: has_events[label])
-    monkeypatch.setattr(
-        service, "count_escalated_events", lambda conn, label: escalation_counts[label]
-    )
-
-    class FakeConn:
-        def execute(self, sql, params=()):
-            if "SELECT 1" in sql:
-                return _FakeSprintCursor([(1,)])
-            raise AssertionError(f"unexpected SQL: {sql}")
-
-    port = _start_service(FakeConn(), 0)
-    try:
-        # /trend
-        status_t, body_t = _get_json(
-            f"http://127.0.0.1:{port}/trend?metric=escalation_rate_percent&start=2024-02&end=2024-02"
-        )
-        assert status_t == 200
-        trend_value = body_t["values"][0]["value"]
-
-        # /range
-        status_r, body_r = _get_json(f"http://127.0.0.1:{port}/range?start=2024-02&end=2024-02")
-        assert status_r == 200
-        range_value = body_r["sprints"]["2024-02"]["escalation_rate_percent"]
-
-        assert trend_value == range_value == 100
-    finally:
-        pass
-
-
 @requires_db
 def test_service_escalation_rate_200_on_sprint_range_and_trend():
-    """AC3: sprint 2024-01 has one completed card and 2 escalated events;
-    /range and /trend both report escalation_rate_percent 200."""
+    """AC3 (#774, #776): sprint 2024-01 has one completed card and 2 escalated
+    events; /range carries no escalation rate and /trend refuses it with 400."""
     import psycopg
 
     conn = psycopg.connect(SPRINT_METRICS_DB)
@@ -6058,14 +6123,13 @@ def test_service_escalation_rate_200_on_sprint_range_and_trend():
         # /range
         status, body = _get_json(f"http://127.0.0.1:{port}/range?start=2024-01&end=2024-01")
         assert status == 200
-        assert body["sprints"]["2024-01"]["escalation_rate_percent"] == 200
+        assert "escalation_rate_percent" not in body["sprints"]["2024-01"]
 
         # /trend
         status, body = _get_json(
             f"http://127.0.0.1:{port}/trend?metric=escalation_rate_percent&start=2024-01&end=2024-01"
         )
-        assert status == 200
-        assert body["values"][0] == {"sprint": "2024-01", "value": 200}
+        assert status == 400
     finally:
         conn.close()
 

@@ -11,7 +11,6 @@ from sprint_metrics.metrics import (
     calculate_blocked_aging,
     calculate_cycle_time_and_lead_time,
     calculate_cycle_time_minutes,
-    calculate_escalation_rate,
     calculate_failure_breakdown,
     calculate_first_attempt_rate,
     calculate_lead_time_minutes,
@@ -51,11 +50,9 @@ def format_sprint_range_json(
     sprints: Mapping[str, list[Card]],
     labels: Sequence[str],
     wip_limits: Mapping[str, int] | None = None,
-    escalations: int = 0,
     as_of: date | None = None,
     thresholds: Mapping[str, float] | None = None,
     metrics: frozenset[str] | None = None,
-    sprint_escalations: Mapping[str, int] | None = None,
 ) -> str:
     """Render one JSON object per sprint label in ``labels``, keyed by label, wrapped
     in a top-level object with ``api_version`` and a ``sprints`` key.
@@ -69,24 +66,15 @@ def format_sprint_range_json(
 
     When ``metrics`` is a non-None frozenset, only the named metric keys are
     included in each sprint entry, its prior, its delta, and its flags.
-
-    When ``sprint_escalations`` is provided, each sprint uses its own escalation
-    count from that mapping instead of the flat ``escalations`` value.
     """
     from sprint_metrics.metrics import (
         calculate_first_attempt_counts,
         calculate_points_delivered,
     )
 
-    def _esc_for(label: str) -> int:
-        if sprint_escalations is not None:
-            return sprint_escalations.get(label, 0)
-        return escalations
-
     per_sprint: dict[str, object] = {}
     for index, label in enumerate(labels):
         cards = sprints[label]
-        esc = _esc_for(label)
         cycle_time, lead_time = calculate_cycle_time_and_lead_time(cards)
         cycle_time_min = calculate_cycle_time_minutes(cards)
         lead_time_min = calculate_lead_time_minutes(cards)
@@ -97,8 +85,6 @@ def format_sprint_range_json(
             "points_delivered": calculate_points_delivered(cards),
             "wip_violations": calculate_wip_violations(cards, wip_limits),
             "blocked_aging_days": calculate_blocked_aging(cards, as_of),
-            "escalation_rate_percent": calculate_escalation_rate(cards, esc),
-            "escalation_count": esc,
             "first_attempt_rate_percent": calculate_first_attempt_rate(cards),
             "first_attempt_numerator": calculate_first_attempt_counts(cards)[0],
             "first_attempt_denominator": calculate_first_attempt_counts(cards)[1],
@@ -114,7 +100,6 @@ def format_sprint_range_json(
         else:
             prior_label = labels[index - 1]
             prior_cards = sprints[prior_label]
-            prior_esc = _esc_for(prior_label)
             prior_cycle, prior_lead = calculate_cycle_time_and_lead_time(prior_cards)
             prior_cycle_min = calculate_cycle_time_minutes(prior_cards)
             prior_lead_min = calculate_lead_time_minutes(prior_cards)
@@ -128,8 +113,6 @@ def format_sprint_range_json(
                 "points_delivered": calculate_points_delivered(prior_cards),
                 "wip_violations": calculate_wip_violations(prior_cards, wip_limits),
                 "blocked_aging_days": calculate_blocked_aging(prior_cards, as_of),
-                "escalation_rate_percent": calculate_escalation_rate(prior_cards, prior_esc),
-                "escalation_count": prior_esc,
                 "first_attempt_rate_percent": calculate_first_attempt_rate(prior_cards),
                 "first_attempt_numerator": calculate_first_attempt_counts(prior_cards)[0],
                 "first_attempt_denominator": calculate_first_attempt_counts(prior_cards)[1],
@@ -150,10 +133,6 @@ def format_sprint_range_json(
                 "wip_violations": sprint_metrics["wip_violations"] - prior["wip_violations"],
                 "blocked_aging_days": calculate_blocked_aging(cards, as_of)
                 - prior["blocked_aging_days"],
-                "escalation_rate_percent": (
-                    sprint_metrics["escalation_rate_percent"] - prior["escalation_rate_percent"]
-                ),
-                "escalation_count": esc - prior_esc,
                 "first_attempt_rate_percent": (
                     sprint_metrics["first_attempt_rate_percent"]
                     - prior["first_attempt_rate_percent"]
@@ -179,7 +158,7 @@ def format_sprint_range_json(
                     else None
                 ),
             }
-        flags = calculate_flags(cards, wip_limits, esc, as_of, thresholds)
+        flags = calculate_flags(cards, wip_limits, as_of, thresholds)
         if metrics is not None:
             sprint_metrics = {k: v for k, v in sprint_metrics.items() if k in metrics}
             if prior is not None:
