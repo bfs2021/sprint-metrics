@@ -299,3 +299,14 @@ def test_rule_released_headings_dated():
     violations = check_released_headings_dated(mutated)
     assert violations, "expected a violation for non-ISO date"
     assert "1.3.3" in violations[0], f"message must name the offending heading: {violations[0]}"
+
+
+def test_unreleased_added_records_window_and_api_version():
+    """AC8: CHANGELOG.md [Unreleased] > Added records the /range window and api_version move."""
+    content = CHANGELOG.read_text()
+    unreleased = content.split("## [Unreleased]")[1].split("## [")[0]
+    added = unreleased.split("### Added")[1].split("###")[0]
+    assert "window" in added, "Added section does not mention the window object"
+    assert "api_version" in added, "Added section does not mention api_version"
+    assert '"5"' in added, "Added section does not name api_version 5"
+    assert '"4"' in added, "Added section does not name the retired api_version 4"

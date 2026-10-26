@@ -122,3 +122,22 @@ def test_docker_run_repeating_program_name_fails():
     )
     assert run.returncode != 0, f"Expected non-zero exit, got {run.returncode}"
     assert "command-line report tool has been retired" in run.stderr
+
+
+def test_ci_workflow_pins_api_version_5_and_filters_window():
+    """AC5: the CI docker job in .github/workflows/tests.yml pins api_version "5"
+    and the field-for-field comparison filters out the new window key."""
+    import yaml
+
+    workflow_path = Path(__file__).parent.parent / ".github" / "workflows" / "tests.yml"
+    workflow = yaml.safe_load(workflow_path.read_text())
+    docker_steps = workflow["jobs"]["docker"]["steps"]
+    tick_step = None
+    for step in docker_steps:
+        if "name" in step and "tick" in step["name"].lower():
+            tick_step = step
+            break
+    assert tick_step is not None, "no step found for the crew's tick"
+    run_script = tick_step["run"]
+    assert '.api_version == "5"' in run_script, "docker job does not pin api_version 5"
+    assert "del(.window)" in run_script, "RANGE_FILTER does not filter out the window key"
