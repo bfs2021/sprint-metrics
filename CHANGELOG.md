@@ -4,6 +4,9 @@
 
 ### Added
 
+- GET /range now names the window it is judging: the top-level `window` object carries `start` (first sprint label), `end` (last sprint label), `sprint_count` (number of sprints in the range), and `no_data` (list of sprint labels with no events), so a gap reads as no data rather than zero
+- The /range and /trend responses carry `api_version` "5"; version "4" is retired. Event intake keeps `api_version` "1"
+
 ### Changed
 
 ### Fixed

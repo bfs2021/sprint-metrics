@@ -431,6 +431,12 @@ def _start_service(conn, port: int, db_url: str = "") -> int:
                         body = format_sprint_range_json(sprints, labels)
                         result = json.loads(body)
                         _attach_range_cost(result, sprints, labels, has_events)
+                        result["window"] = {
+                            "start": labels[0],
+                            "end": labels[-1],
+                            "sprint_count": len(labels),
+                            "no_data": [label for label in labels if label not in has_events],
+                        }
                         self._send_json(200, result)
                         status = 200
                         return
