@@ -1111,3 +1111,40 @@ def test_no_documentation_shows_a_cli_flag():
             stripped = line.strip()
             if re.match(r"^sprint-metrics\s+\S+", stripped):
                 pytest.fail(f"{name}: {line!r} looks like a sprint-metrics command with a file argument")
+
+
+def test_service_md_range_row_describes_roster_answer():
+    """AC5: the GET /range row in docs/service.md's generated section describes
+    the roster: per-sprint completed stories, released epics and achieved Goals
+    by identifier; sprints whose stories carry no links read null (no backfill)."""
+    section = _extract_marked_section((DOCS_DIR / "service.md").read_text(), "service")
+    row = next(line for line in section.splitlines() if line.startswith("| GET | /range"))
+    for phrase in (
+        "roster",
+        "completed",
+        "released",
+        "achieved",
+        "identifier",
+        "null",
+        "no backfill",
+    ):
+        assert phrase in row, f"GET /range row missing {phrase!r}: {row}"
+
+
+def test_service_md_api_version_paragraph_describes_version_5():
+    """AC5: docs/service.md's api_version paragraph states the response
+    api_version is '5', version '4' is retired, and intake keeps '1'."""
+    text = (DOCS_DIR / "service.md").read_text()
+    # The /range and /trend api_version paragraph is outside the generated section
+    paragraph = text.split("The /range and /trend responses carry their own")[1]
+    # Find the end of the paragraph (next blank line or next heading)
+    end = paragraph.find("\n\n")
+    if end == -1:
+        end = len(paragraph)
+    paragraph = paragraph[:end]
+    assert '"5"' in paragraph
+    assert '"4"' in paragraph
+    assert "retired" in paragraph
+    assert "5.0.0" in paragraph
+    assert "Event intake" in paragraph
+    assert '"1"' in paragraph
