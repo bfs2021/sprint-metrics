@@ -988,6 +988,15 @@ def test_service_md_trend_row_lists_cost_metrics():
         assert name in section, f"missing cost metric {name!r} in /trend row"
 
 
+def test_service_md_trend_row_lists_cost_by_kind_measures():
+    """AC5: the /trend row in docs/service.md names the addition_working_time_minutes
+    and change_working_time_minutes measures."""
+    text = (DOCS_DIR / "service.md").read_text()
+    section = _extract_marked_section(text, "service")
+    assert "addition_working_time_minutes" in section
+    assert "change_working_time_minutes" in section
+
+
 def test_metrics_md_cost_names_match_service_metrics():
     """AC6: the cost measure names in the generated metrics table match the names
     in ALL_METRICS and _METRIC_COLUMNS exactly."""
@@ -1112,6 +1121,24 @@ def test_metrics_md_metrics_table_has_working_time_row():
     assert "whole minutes" in row
 
 
+def test_metrics_md_metrics_table_has_cost_by_kind_rows():
+    """AC5: docs/metrics.md's metrics table carries rows for
+    addition_working_time_minutes and change_working_time_minutes, stating
+    what cost by kind measures, its unit (whole minutes), and that kind-less
+    sprints read null."""
+    text = (DOCS_DIR / "metrics.md").read_text()
+    table = _extract_marked_section(text, "metrics")
+    add_row = next(line for line in table.splitlines() if "`addition_working_time_minutes`" in line)
+    cells = [c.strip() for c in add_row.split("|") if c.strip()]
+    assert cells[1] == "`addition_working_time_minutes`"
+    assert "whole minutes" in add_row
+    assert "None" in add_row or "null" in add_row.lower()
+    chg_row = next(line for line in table.splitlines() if "`change_working_time_minutes`" in line)
+    cells = [c.strip() for c in chg_row.split("|") if c.strip()]
+    assert cells[1] == "`change_working_time_minutes`"
+    assert "whole minutes" in chg_row
+
+
 def test_service_md_cost_example_is_complete():
     """AC7: the event-intake section has a complete cost-payload example with all
     five fields and non-negative integer values, in a copy-ready JSON block."""
@@ -1174,9 +1201,9 @@ def test_service_md_range_row_describes_roster_answer():
         assert phrase in row, f"GET /range row missing {phrase!r}: {row}"
 
 
-def test_service_md_api_version_paragraph_describes_version_6():
+def test_service_md_api_version_paragraph_describes_version_7():
     """AC: docs/service.md's api_version paragraph states the response
-    api_version is '6', version '5' is retired, and intake keeps '1'."""
+    api_version is '7', version '6' is retired, and intake keeps '1'."""
     text = (DOCS_DIR / "service.md").read_text()
     # The /range and /trend api_version paragraph is outside the generated section
     paragraph = text.split("The /range and /trend responses carry their own")[1]
@@ -1185,10 +1212,10 @@ def test_service_md_api_version_paragraph_describes_version_6():
     if end == -1:
         end = len(paragraph)
     paragraph = paragraph[:end]
+    assert '"7"' in paragraph
     assert '"6"' in paragraph
-    assert '"5"' in paragraph
     assert "retired" in paragraph
-    assert "6.0.0" in paragraph
+    assert "7.0.0" in paragraph
     assert "Event intake" in paragraph
     assert '"1"' in paragraph
 
