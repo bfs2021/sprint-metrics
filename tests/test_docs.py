@@ -1298,9 +1298,9 @@ def test_service_md_range_row_describes_roster_answer():
         assert phrase in row, f"GET /range row missing {phrase!r}: {row}"
 
 
-def test_service_md_api_version_paragraph_describes_version_8():
+def test_service_md_api_version_paragraph_describes_version_9():
     """AC: docs/service.md's api_version paragraph states the response
-    api_version is '8', version '7' is retired, and intake keeps '1'."""
+    api_version is '9', version '8' is retired, and intake keeps '1'."""
     text = (DOCS_DIR / "service.md").read_text()
     # The /range and /trend api_version paragraph is outside the generated section
     paragraph = text.split("The /range and /trend responses carry their own")[1]
@@ -1309,10 +1309,10 @@ def test_service_md_api_version_paragraph_describes_version_8():
     if end == -1:
         end = len(paragraph)
     paragraph = paragraph[:end]
+    assert '"9"' in paragraph
     assert '"8"' in paragraph
-    assert '"7"' in paragraph
     assert "retired" in paragraph
-    assert "8.0.0" in paragraph
+    assert "9.0.0" in paragraph
     assert "Event intake" in paragraph
     assert '"1"' in paragraph
 
@@ -1355,3 +1355,34 @@ def test_metrics_md_names_dora_measures():
         line for line in section.splitlines() if "`mean_time_to_recovery_minutes`" in line
     )
     assert "whole minutes" in mttr_row
+
+
+def test_metrics_md_idle_time_section_states_span_minus_session_time():
+    """AC: docs/metrics.md's idle-time section states the idle time is the registered
+    sprint span minus the in-span session time, in whole minutes; the span is taken in
+    the sprint's registered timezone; a session window is clamped to the span; a rework
+    session never re-sent as 'started' reads as idle (the working-time fidelity bound);
+    and a sprint with no events or no registered definition reads null (the whole span
+    is not reported as idle when no session ran)."""
+    text = (DOCS_DIR / "metrics.md").read_text()
+    section = re.sub(
+        r"\s+",
+        " ",
+        text.split("### Idle time against the sprint's duration", 1)[1].split("\n### ", 1)[0],
+    )
+    # The idle time is the registered span minus the in-span session time, in whole minutes.
+    assert "registered span minus the in-span session time" in section
+    assert "whole minutes" in section
+    # The span is taken in the sprint's registered timezone.
+    assert "registered timezone" in section
+    # A session window is clamped to the span.
+    assert "clamped to the span" in section
+    # The working-time fidelity bound: a rework session never re-sent as 'started'
+    # reads as idle.
+    assert "never re-sent as" in section and "reads as idle" in section
+    assert "fidelity bound" in section
+    # The whole span is not reported as idle when no session ran.
+    assert "whole span is not reported as idle" in section
+    # The idle_minutes table row names the unit (whole minutes).
+    row = next(line for line in text.splitlines() if "`idle_minutes`" in line)
+    assert "whole minutes" in row
