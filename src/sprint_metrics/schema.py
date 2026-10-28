@@ -298,6 +298,14 @@ SPRINT_RANGE_SCHEMA: dict[str, object] = {
                         },
                         "required": ["addition", "change"],
                     },
+                    "model_time_split": {
+                        "type": ["object", "null"],
+                        "properties": {
+                            "refinement": {"type": "integer"},
+                            "delivery": {"type": "integer"},
+                        },
+                        "required": ["refinement", "delivery"],
+                    },
                     "prior": {
                         "type": ["object", "null"],
                         "properties": {
@@ -315,6 +323,12 @@ SPRINT_RANGE_SCHEMA: dict[str, object] = {
                             "working_time_minutes": {"type": ["integer", "null"]},
                             "addition_working_time_minutes": {"type": ["integer", "null"]},
                             "change_working_time_minutes": {"type": ["integer", "null"]},
+                            "model_time_split_refinement_minutes": {
+                                "type": ["integer", "null"]
+                            },
+                            "model_time_split_delivery_minutes": {
+                                "type": ["integer", "null"]
+                            },
                         },
                     },
                     "delta": {
@@ -334,6 +348,12 @@ SPRINT_RANGE_SCHEMA: dict[str, object] = {
                             "working_time_minutes": {"type": ["integer", "null"]},
                             "addition_working_time_minutes": {"type": ["integer", "null"]},
                             "change_working_time_minutes": {"type": ["integer", "null"]},
+                            "model_time_split_refinement_minutes": {
+                                "type": ["integer", "null"]
+                            },
+                            "model_time_split_delivery_minutes": {
+                                "type": ["integer", "null"]
+                            },
                         },
                     },
                 },
